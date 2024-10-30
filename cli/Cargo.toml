@@ -1,0 +1,17 @@
+[package]
+name = "lev"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+reqwest = { version = "0.12.8", features = ["multipart", "stream"]}
+shared = { path = "../shared" }
+clap = { version = "4.3", features = ["derive"] }
+anyhow = "1.0.89"
+tokio = { version = "1.40.0", features = ["full"] } # "1.40.0"}
+futures-util = "0.3.31"
+futures = "0.3.31"
+url = "2.3.1"
+serde_json = "1.0.132"
+sqlx = { version = "0.8", features = [ "runtime-tokio", "tls-native-tls", "sqlite" ] }
+dirs = "5.0.1"
