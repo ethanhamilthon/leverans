@@ -19,6 +19,7 @@ pub enum Commands {
         #[arg(short = 'c', long, default_value = "./")]
         context: String,
     },
+    Version,
     Auth {
         #[arg(short = 'a', long, help = "the address of your server, eg 312.89.06.172 or mydomain.com", default_value = None)]
         address: Option<String>,
@@ -28,9 +29,14 @@ pub enum Commands {
         address: Option<String>,
     },
     Logout,
+    Whoami,
     Docker {
         #[command(subcommand)]
         command: DockerCommands,
+    },
+    Secret {
+        #[command(subcommand)]
+        command: SecretCommands,
     },
 }
 
@@ -39,6 +45,17 @@ pub enum DockerCommands {
     Image {
         #[command(subcommand)]
         command: DockerImageCommands,
+    },
+}
+
+#[derive(Subcommand, Clone)]
+pub enum SecretCommands {
+    Ls,
+    Add {
+        #[arg(short = 'k', long, default_value = None)]
+        key: Option<String>,
+        #[arg(short = 'v', long, default_value = None)]
+        value: Option<String>,
     },
 }
 

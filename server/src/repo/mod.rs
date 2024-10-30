@@ -1,7 +1,9 @@
+pub mod secret_repo;
 pub mod user_repo;
 
 use anyhow::Result;
-use shared::{create_file_if_not_exist, ok};
+use secret_repo::SecretData;
+use shared::{create_file_if_not_exist, ok, Secret};
 use sqlx::{query, sqlite::SqlitePool, Executor};
 use user_repo::User;
 
@@ -17,6 +19,7 @@ impl Repo {
         }
         let pool = SqlitePool::connect(if is_memory { ":memory:" } else { url }).await?;
         User::migrate(&pool).await?;
+        SecretData::migrate(&pool).await?;
         ok!(Self { pool })
     }
 }

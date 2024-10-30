@@ -1,9 +1,9 @@
 use reqwest::{multipart::Form, StatusCode};
-use serde_json;
+use serde_json::{self, json};
 use std::{borrow::Borrow, collections::HashMap};
 
 use anyhow::{anyhow, Result};
-use shared::{err, ok, UserAuthBody};
+use shared::{err, ok, Secret, UserAuthBody};
 use url::Url;
 
 pub struct API {
@@ -145,6 +145,52 @@ impl API {
         } else {
             let error_text = res.text().await?;
             Err(anyhow!("Failed to login super user: {}", error_text))
+        }
+    }
+
+    pub async fn add_secret(&self, key: &str, value: &str, token: &str) -> Result<()> {
+        let mut super_user_url = self.main_url.clone();
+        super_user_url.set_path("/secret");
+        let res = self
+            .req_client
+            .post(super_user_url)
+            .body(
+                json!({
+                    "key": key,
+                    "value": value
+                })
+                .to_string(),
+            )
+            .header("Content-Type", "application/json")
+            .header("X-LEVERANS-PASS", "true")
+            .header("Authorization", token)
+            .send()
+            .await?;
+        if res.status().is_success() {
+            Ok(())
+        } else {
+            let error_text = res.text().await?;
+            Err(anyhow!("Failed to add secret: {}", error_text))
+        }
+    }
+
+    pub async fn list_secret(&self, token: &str) -> Result<Vec<Secret>> {
+        let mut super_user_url = self.main_url.clone();
+        super_user_url.set_path("/secret");
+        let res = self
+            .req_client
+            .get(super_user_url)
+            .header("X-LEVERANS-PASS", "true")
+            .header("Authorization", token)
+            .send()
+            .await?;
+        if res.status().is_success() {
+            let text = res.text().await?;
+            let secrets: Vec<Secret> = serde_json::from_str(&text)?;
+            Ok(secrets)
+        } else {
+            let error_text = res.text().await?;
+            Err(anyhow!("Failed to list secret: {}", error_text))
         }
     }
 }

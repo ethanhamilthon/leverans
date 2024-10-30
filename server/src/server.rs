@@ -14,6 +14,7 @@ use docker_handler::{list_images, upload};
 use futures::FutureExt;
 use futures_util::future::{ready, Ready};
 use healthz_handler::handle_healthz;
+use secret_handler::{handle_add_secret, handle_list_secrets};
 use shared::docker::DockerService;
 
 use crate::repo::Repo;
@@ -22,6 +23,7 @@ pub mod auth_handler;
 pub mod deploy_handler;
 pub mod docker_handler;
 pub mod healthz_handler;
+pub mod secret_handler;
 
 #[derive(Debug, Clone)]
 pub struct ServerData {
@@ -67,6 +69,8 @@ pub async fn start_server(server: ServerData) -> std::io::Result<()> {
             .route("/auth/super", web::get().to(handle_is_super_user_exists))
             .route("/register/super", web::post().to(register_super_user))
             .route("/login/super", web::post().to(login_user))
+            .route("/secret", web::post().to(handle_add_secret))
+            .route("/secret", web::get().to(handle_list_secrets))
     })
     .bind(("127.0.0.1", port))?
     .run()

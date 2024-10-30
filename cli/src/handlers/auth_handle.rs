@@ -130,3 +130,10 @@ pub async fn handle_logout() -> Result<()> {
     println!("✔︎ User logged out successfully");
     Ok(())
 }
+
+pub async fn whoami() -> Result<()> {
+    let db = UserData::load_db(false).await?;
+    let user = db.load_current_user().await?;
+    println!("✔︎ Current user url: {}", user.remote_url);
+    Ok(())
+}

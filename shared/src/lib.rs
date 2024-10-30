@@ -94,3 +94,9 @@ pub fn create_file_if_not_exist(path: &str) -> Result<()> {
     }
     Ok(())
 }
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct Secret {
+    pub key: String,
+    pub created_at: String,
+}

@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
-    "cli", "exp",
+    "cli",
     "server",
     "shared"
 ]
