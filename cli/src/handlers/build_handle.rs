@@ -12,29 +12,21 @@ use shared::{config::MainConfig, docker::DockerService, err, ok};
 
 use crate::{api::API, data::UserData, utils::get_unix_seconds};
 
-pub struct BuildHandle {
-    docker: DockerService,
-    abs_path: PathBuf,
-    remote_platform: Option<String>,
+pub struct BuildParams {
+    pub docker: DockerService,
+    pub abs_path: PathBuf,
+    pub remote_platform: Option<String>,
+    pub main_config: MainConfig,
+    pub token: String,
+    pub filter: Option<String>,
 }
 
-impl BuildHandle {
-    pub fn new(
-        docker: DockerService,
-        abs_path: PathBuf,
-        remote_platform: Option<String>,
-    ) -> Result<Self> {
-        ok!(Self {
-            docker: docker,
-            abs_path,
-            remote_platform,
-        })
-    }
-}
+pub async fn build_images(params: BuildParams) -> Result<()> {
+    let cfg = params.main_config.clone();
+    let token = params.token.clone();
 
-pub async fn build_images(bh: BuildHandle, cfg: MainConfig, token: String) -> Result<()> {
-    let build_tasks = get_build_tasks(cfg, bh.remote_platform.clone());
-    let arc_bh = Arc::new(bh);
+    let build_tasks = get_build_tasks(cfg, params.remote_platform.clone(), &params.filter.clone());
+    let arc_bh = Arc::new(params);
     let (tx, rx) = watch::channel(false);
     let mut joined_tasks = vec![];
 
@@ -93,12 +85,12 @@ pub async fn build_images(bh: BuildHandle, cfg: MainConfig, token: String) -> Re
     upload(arc_bh.clone(), build_tasks, token).await?;
     ok!(())
 }
-pub async fn upload(bh: Arc<BuildHandle>, images: Vec<BuildTask>, token: String) -> Result<()> {
-    let bh = Box::leak(Box::new(Arc::clone(&bh)));
+pub async fn upload(params: Arc<BuildParams>, images: Vec<BuildTask>, token: String) -> Result<()> {
+    let docker = Arc::new(params.clone().docker.clone());
     for task in images {
         print!("📤 Uploading image: {}\n", &task.app_name);
 
-        let stream = bh.docker.save_image(&task.tag).await;
+        let stream = docker.clone().save_image(task.tag.clone());
         let stream_body = Body::wrap_stream(stream);
 
         let part = multipart::Part::stream(stream_body).file_name("image.tar");
@@ -128,10 +120,17 @@ pub struct BuildTask {
     platform: String,
 }
 
-fn get_build_tasks(config: MainConfig, remote_platform: Option<String>) -> Vec<BuildTask> {
+fn get_build_tasks(
+    config: MainConfig,
+    remote_platform: Option<String>,
+    filter: &Option<String>,
+) -> Vec<BuildTask> {
     let mut build_tasks = Vec::new();
     if let Some(apps) = config.app.as_ref() {
         for (app_name, app_config) in apps {
+            if filter.is_some() && app_name != filter.as_ref().unwrap() {
+                continue;
+            }
             build_tasks.push(BuildTask {
                 app_name: app_name.clone(),
                 docker_file_name: app_config

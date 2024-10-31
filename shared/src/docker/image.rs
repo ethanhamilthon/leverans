@@ -3,6 +3,7 @@ use std::{
     io::{BufRead, BufReader},
     path::{Path, PathBuf},
     pin::Pin,
+    sync::Arc,
 };
 
 use anyhow::{anyhow, Result};
@@ -84,11 +85,11 @@ impl DockerService {
         Ok(())
     }
 
-    pub async fn save_image(
-        &self,
-        image_name: &str,
-    ) -> Pin<Box<dyn Stream<Item = Result<Bytes, bollard::errors::Error>> + Send + '_>> {
-        Box::pin(self.conn.export_image(image_name))
+    pub fn save_image(
+        self: Arc<Self>,
+        image_name: String,
+    ) -> Pin<Box<dyn Stream<Item = Result<Bytes, bollard::errors::Error>> + Send>> {
+        Box::pin(self.conn.export_image(&image_name))
     }
 
     pub async fn build_image(

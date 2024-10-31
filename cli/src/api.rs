@@ -1,6 +1,5 @@
 use reqwest::{multipart::Form, StatusCode};
 use serde_json::{self, json};
-use std::{borrow::Borrow, collections::HashMap};
 
 use anyhow::{anyhow, Result};
 use shared::{err, ok, Secret, UserAuthBody};
@@ -22,7 +21,10 @@ impl API {
     pub async fn upload_config(&self, config: String, token: String) -> Result<()> {
         let mut upload_url = self.main_url.clone();
         upload_url.set_path("/deploy");
-        let body = serde_json::to_string(&HashMap::from([("config", config)])).unwrap();
+        let body = json!({
+            "config": config
+        })
+        .to_string();
         let res = self
             .req_client
             .post(upload_url)

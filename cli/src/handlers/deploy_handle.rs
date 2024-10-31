@@ -12,7 +12,7 @@ use shared::{
 use crate::{
     api::API,
     data::UserData,
-    handlers::build_handle::{build_images, BuildHandle},
+    handlers::build_handle::{build_images, BuildParams},
     utils::open_file_as_string,
 };
 
@@ -39,17 +39,15 @@ pub async fn handle_deploy(
             .ok_or(anyhow!("failed to convert path to string"))?,
     )?;
     if !no_build {
-        let builder = BuildHandle::new(
-            DockerService::new()?,
-            abs_path.clone(),
-            get_docker_platform().ok(),
-        )?;
-        build_images(
-            builder,
-            MainConfig::from_str(&raw_config).map_err(|e| anyhow!("{}", e))?,
-            user.remote_token.clone(),
-        )
-        .await?;
+        let builder = BuildParams {
+            docker: DockerService::new()?,
+            abs_path: abs_path.clone(),
+            remote_platform: get_docker_platform().ok(),
+            main_config: MainConfig::from_str(&raw_config).map_err(|_| anyhow!("invalid yaml"))?,
+            token: user.remote_token.clone(),
+            filter,
+        };
+        build_images(builder).await?;
     }
     println!("👾 Deploying...");
     let remote_url = UserData::load_db(false)
