@@ -4,6 +4,7 @@ use crate::{
     docker::{image::DockerImage, service::ServiceParam},
     err, ok,
     rollup::rollupables::{db_params::DBParams, EnvValues},
+    SecretValue,
 };
 use anyhow::{anyhow, Result};
 
@@ -13,7 +14,12 @@ use super::{
 };
 
 impl Rollup {
-    pub async fn rollup_app(&self, ra_app: RollupableApp, ra_all: &[Rollupable]) -> Result<()> {
+    pub async fn rollup_app(
+        &self,
+        ra_app: RollupableApp,
+        ra_all: &[Rollupable],
+        secrets: &[SecretValue],
+    ) -> Result<()> {
         println!("Rolling up app: {:?}", ra_app);
         let app_images: Vec<DockerImage> = self
             .docker
@@ -63,7 +69,7 @@ impl Rollup {
         )?;
 
         // add envs
-        self.add_envs(&mut docker_params, ra_app.envs, ra_all);
+        self.add_envs(&mut docker_params, ra_app.envs, ra_all, secrets);
 
         // create or update service
         self.create_or_update_service(docker_params).await
@@ -94,13 +100,18 @@ impl Rollup {
         docker_params: &mut ServiceParam,
         envs: Option<HashMap<String, EnvValues>>,
         ras: &[Rollupable],
+        secrets: &[SecretValue],
     ) {
         if envs.is_some() {
             for (k, v) in envs.clone().unwrap() {
                 match v {
                     EnvValues::Text(v) => docker_params.add_env(k, v),
-                    EnvValues::Secret(_v) => {
-                        todo!()
+                    EnvValues::Secret(v) => {
+                        for secret in secrets {
+                            if secret.key == v {
+                                docker_params.add_env(k.clone(), secret.value.clone());
+                            }
+                        }
                     }
                     EnvValues::This { service, method } => {
                         println!("this: {:?} {:?}", service, method);
@@ -116,15 +127,6 @@ impl Rollup {
                                     let this_ra_sv = ra_service.unwrap();
                                     if let Ok(conn_str) = this_ra_sv.get_connection() {
                                         docker_params.add_env(k, conn_str);
-                                    }
-                                    if let Rollupable::Database(rdb) = this_ra_sv {
-                                        if let DBParams::SQLite { needs, .. } = &rdb.params {
-                                            if let Some(mounts) = needs.mounts.clone() {
-                                                for mount in mounts {
-                                                    docker_params.add_mount(mount);
-                                                }
-                                            }
-                                        }
                                     }
                                 }
                                 _ => {}

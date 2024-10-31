@@ -5,7 +5,7 @@ use crate::{
     commands::{Commands, DockerCommands, DockerImageCommands, Lev},
     handlers::{
         auth_handle::{handle_auth, handle_logout, whoami},
-        deploy_handle::DeployHandle,
+        deploy_handle::handle_deploy,
         handle_local,
         secret_handle::{add_secrets, list_secrets},
     },
@@ -14,7 +14,12 @@ use crate::{
 pub async fn handle_routes(cli: Lev) -> Result<()> {
     match cli.command {
         Commands::Local { build } => handle_local(build).await,
-        Commands::Deploy { file, context } => DeployHandle::new(file, context)?.handle().await,
+        Commands::Deploy {
+            file,
+            context,
+            no_build,
+            filter,
+        } => handle_deploy(file, context, no_build, filter).await,
         Commands::Auth { address } => handle_auth(address, false).await,
         Commands::Login { address } => handle_auth(address, true).await,
         Commands::Logout => handle_logout().await,

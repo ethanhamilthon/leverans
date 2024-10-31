@@ -12,14 +12,9 @@ use anyhow::{anyhow, Result};
 impl Rollup {
     pub async fn rollup_db(&self, ra_db: RollupableDatabase) -> Result<()> {
         println!("Rolling up db: {:?}", ra_db);
-        if let DBParams::SQLite { needs } = &ra_db.params {
-            self.rollup_db_sqlite(needs.clone()).await?;
-            ok!(())
-        }
         let needs = match ra_db.params.clone() {
             DBParams::Postgres { needs, .. } => needs,
             DBParams::MySQL { needs, .. } => needs,
-            _ => err!(anyhow!("SQLite must be already handled")),
         };
         let mut docker_params = ServiceParam::new(
             needs.host.clone().ok_or(anyhow!("No host name"))?,
@@ -74,7 +69,6 @@ impl Rollup {
                     docker_params.add_port(port, port);
                 }
             }
-            _ => err!(anyhow!("SQLite must be already handled")),
         }
 
         let exists = self
@@ -96,27 +90,6 @@ impl Rollup {
                 .create_service(docker_params)
                 .await
                 .map_err(|_| anyhow!(format!("failed to create docker service")))?;
-        }
-        ok!(())
-    }
-
-    async fn rollup_db_sqlite(&self, params: DBParamsNeeds) -> Result<()> {
-        let exists = self
-            .docker
-            .list_volumes()
-            .await?
-            .volumes
-            .unwrap()
-            .into_iter()
-            .any(|volume| volume.name == params.volume_name);
-        if !exists {
-            self.docker
-                .create_volume(params.volume_name.clone(), "local")
-                .await?;
-            self.docker
-                .create_file_for_volume(params.volume_name.clone(), "main.db".to_string())
-                .await?;
-            ok!(())
         }
         ok!(())
     }

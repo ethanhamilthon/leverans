@@ -97,7 +97,8 @@ impl DockerService {
         image_name: &str,
         context: &str,
         platform: Option<&str>,
-    ) -> Result<Pin<Box<dyn Stream<Item = Result<BuildInfo, bollard::errors::Error>> + '_>>> {
+    ) -> Result<Pin<Box<dyn Stream<Item = Result<BuildInfo, bollard::errors::Error>> + '_ + Send>>>
+    {
         let options = BuildImageOptions {
             dockerfile: docker_file_name, // Название Dockerfile
             t: image_name,                // Тег для образа

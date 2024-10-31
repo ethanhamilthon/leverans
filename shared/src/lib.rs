@@ -100,3 +100,9 @@ pub struct Secret {
     pub key: String,
     pub created_at: String,
 }
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct SecretValue {
+    pub key: String,
+    pub value: String,
+}

@@ -92,6 +92,7 @@ impl Rollupable {
         let mut envs: HashMap<String, EnvValues> = HashMap::new();
         if let Some(cfg_envs) = cfg.env {
             for (k, v) in cfg_envs {
+                dbg!("new env", &k, &v, EnvValues::parse_env(&v)?);
                 envs.insert(k, EnvValues::parse_env(&v)?);
             }
         }
@@ -115,6 +116,7 @@ impl Rollupable {
         let mut envs: HashMap<String, EnvValues> = HashMap::new();
         if let Some(cfg_envs) = cfg.env {
             for (k, v) in cfg_envs {
+                dbg!("new env", &k, &v, EnvValues::parse_env(&v)?);
                 envs.insert(k, EnvValues::parse_env(&v)?);
             }
         }

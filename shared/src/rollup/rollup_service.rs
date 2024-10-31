@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use crate::{
     docker::service::{ServiceMount, ServiceParam},
-    ok,
+    ok, SecretValue,
 };
 
 use super::{
@@ -13,7 +13,12 @@ use super::{
 use anyhow::Result;
 
 impl Rollup {
-    pub async fn rollup_service(&self, ra: RollupableService, ras: &[Rollupable]) -> Result<()> {
+    pub async fn rollup_service(
+        &self,
+        ra: RollupableService,
+        ras: &[Rollupable],
+        secrets: &[SecretValue],
+    ) -> Result<()> {
         // pull image if not exists
         if !self
             .docker
@@ -31,7 +36,7 @@ impl Rollup {
             ServiceParam::new(ra.host.clone(), ra.image.clone(), self.network_name.clone());
         self.add_volumes(&mut docker_params, ra.volumes.clone())
             .await?;
-        self.add_envs(&mut docker_params, ra.envs.clone(), &ras);
+        self.add_envs(&mut docker_params, ra.envs.clone(), &ras, secrets);
 
         // add traefik routing rules
         self.add_routing_rules(

@@ -1,13 +1,9 @@
 use reqwest::{multipart, Body};
-use std::{
-    path::{Path, PathBuf},
-    pin::Pin,
-    sync::Arc,
-};
-use tokio::sync::{watch, Mutex};
+use std::path::{Path, PathBuf};
+use tokio::sync::watch;
 
 use anyhow::{anyhow, Result};
-use futures::{Stream, StreamExt};
+use futures::StreamExt;
 use shared::{config::MainConfig, docker::DockerService, err, ok};
 
 use crate::{api::API, data::UserData, utils::get_unix_seconds};
@@ -32,21 +28,15 @@ impl BuildHandle {
     }
 }
 
-pub async fn build_images(bh: BuildHandle, cfg: MainConfig, token: String) -> Result<()> {
+pub async fn build_images(bh: &BuildHandle, cfg: MainConfig, token: String) -> Result<()> {
     let build_tasks = get_build_tasks(cfg, bh.remote_platform.clone());
-    let arc_bh = Arc::new(bh);
     let (tx, rx) = watch::channel(false);
-    let mut joined_tasks = vec![];
-
-    for task in &build_tasks.clone() {
+    for task in &build_tasks {
         let task = task.clone();
-        let bh = arc_bh.clone();
-        let rx = rx.clone();
-        joined_tasks.push(tokio::spawn(async move {
+        tokio::spawn(async move {
             print!("🔧 Building app: {}\n", task.app_name);
             let abs_context = bh.abs_path.join(&task.context);
-            let mut logs = vec![];
-            let mut stream: Pin<Box<dyn Stream<Item = Result<_, _>> + Send>> = bh
+            let mut stream = bh
                 .docker
                 .build_image(
                     &task.docker_file_name,
@@ -54,51 +44,30 @@ pub async fn build_images(bh: BuildHandle, cfg: MainConfig, token: String) -> Re
                     &abs_context.to_str().unwrap(),
                     Some(&task.platform),
                 )
-                .await
-                .map_err(|e| {
-                    let err_str = e.to_string();
-                    logs.push(err_str.clone());
-                    (task.app_name.clone(), logs.clone())
-                })?;
+                .await?;
 
             while let Some(msg) = stream.next().await {
-                if *rx.borrow() {
-                    ok!(task.app_name.clone())
-                }
                 match msg {
-                    Ok(msg) => logs.push(msg.stream.unwrap_or("".to_string())),
+                    Ok(msg) => print!("{}", msg.stream.unwrap_or("".to_string())),
                     Err(err) => {
-                        let err_str = err.to_string();
-                        logs.push(err_str.clone());
-                        err!((task.app_name.clone(), logs))
+                        err!(anyhow!("⚠️  Error: {}", err))
                     }
                 }
             }
             println!("✔︎ Building Done: {}\n", task.app_name);
-            ok!(task.app_name)
-        }));
+            ok!(())
+        });
     }
 
-    for task in joined_tasks {
-        if let Err((app_name, logs)) = task.await? {
-            tx.send(true)?;
-            println!("❌ Build Error: {}\n", app_name);
-            for log in logs {
-                println!("{}", log);
-            }
-            err!(anyhow!("Error on building app: {}", app_name));
-        }
-    }
-
-    upload(arc_bh.clone(), build_tasks, token).await?;
+    upload(bh, build_tasks, token).await?;
     ok!(())
 }
-pub async fn upload(bh: Arc<BuildHandle>, images: Vec<BuildTask>, token: String) -> Result<()> {
-    let bh = Box::leak(Box::new(Arc::clone(&bh)));
+pub async fn upload(bh: &BuildHandle, images: Vec<BuildTask>, token: String) -> Result<()> {
+    let docker = Box::leak(Box::new(bh.docker.clone()));
     for task in images {
         print!("📤 Uploading image: {}\n", &task.app_name);
 
-        let stream = bh.docker.save_image(&task.tag).await;
+        let stream = docker.save_image(&task.tag).await;
         let stream_body = Body::wrap_stream(stream);
 
         let part = multipart::Part::stream(stream_body).file_name("image.tar");

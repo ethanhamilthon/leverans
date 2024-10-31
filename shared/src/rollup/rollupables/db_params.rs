@@ -25,22 +25,11 @@ pub enum DBParams {
         port: u16,
         needs: DBParamsNeeds,
     },
-    SQLite {
-        needs: DBParamsNeeds,
-    },
 }
 
 impl DBParams {
     pub fn from_config(cfg: DbConfig, name: String, project_name: String) -> Option<Self> {
         match cfg.from.as_str() {
-            "sqlite" => Some(Self::SQLite {
-                needs: DBParamsNeeds::default()
-                    .add_volume_name(format!("{}-{}-volume", project_name, name))
-                    .add_mounts(vec![ServiceMount::Volume(
-                        format!("{}-{}-volume", project_name, name),
-                        "/data/".to_string(),
-                    )]),
-            }),
             "mysql" => Some(Self::MySQL {
                 username: (
                     format!("MYSQL_USER"),
@@ -128,8 +117,6 @@ impl DBParams {
                 port,
                 database.1
             )),
-
-            Self::SQLite { .. } => ok!("/data/main.db".to_string()),
         }
     }
 }

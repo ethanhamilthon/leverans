@@ -1,6 +1,6 @@
 use std::{future::Future, pin::Pin, str::FromStr, sync::Arc};
 
-use crate::{config::MainConfig, docker::DockerService, ok};
+use crate::{config::MainConfig, docker::DockerService, ok, Secret, SecretValue};
 use anyhow::Result;
 use rollup_utils::create_traefik_if_not_exists;
 use rollupables::Rollupable;
@@ -56,11 +56,11 @@ impl Rollup {
         (self.write)(s).await
     }
 
-    pub async fn rollup(&self, ras: Vec<Rollupable>) -> Result<()> {
+    pub async fn rollup(&self, ras: Vec<Rollupable>, secrets: Vec<SecretValue>) -> Result<()> {
         match self.mode {
             RollupMode::Local => self.rollup_local(ras).await,
             RollupMode::LocalBuild => self.rollup_local_build(ras).await,
-            RollupMode::Deploy => self.rollup_deploy(ras).await,
+            RollupMode::Deploy => self.rollup_deploy(ras, secrets).await,
         }
     }
 
@@ -72,13 +72,14 @@ impl Rollup {
         todo!()
     }
 
-    async fn rollup_deploy(&self, ras: Vec<Rollupable>) -> Result<()> {
+    async fn rollup_deploy(&self, ras: Vec<Rollupable>, secrets: Vec<SecretValue>) -> Result<()> {
         for rollupable in &ras {
             match rollupable {
-                Rollupable::App(ra_app) => self.rollup_app(ra_app.clone(), &ras).await?,
+                Rollupable::App(ra_app) => self.rollup_app(ra_app.clone(), &ras, &secrets).await?,
                 Rollupable::Database(ra_db) => self.rollup_db(ra_db.clone()).await?,
                 Rollupable::Service(ra_service) => {
-                    self.rollup_service(ra_service.clone(), &ras).await?
+                    self.rollup_service(ra_service.clone(), &ras, &secrets)
+                        .await?
                 }
             }
         }

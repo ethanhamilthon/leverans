@@ -18,6 +18,11 @@ pub enum Commands {
 
         #[arg(short = 'c', long, default_value = "./")]
         context: String,
+
+        #[arg(short = 'n', long, default_value_t = false)]
+        no_build: bool,
+
+        filter: Option<String>,
     },
     Version,
     Auth {
