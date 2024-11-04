@@ -46,7 +46,7 @@ impl SecretData {
         Ok(rows)
     }
 
-    pub fn get_created_at(self) -> Result<DateTime<Utc>> {
+    pub fn get_created_at(&self) -> Result<DateTime<Utc>> {
         let dt = DateTime::parse_from_rfc3339(&self.created_at)?;
         Ok(dt.with_timezone(&Utc))
     }

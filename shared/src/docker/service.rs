@@ -74,22 +74,22 @@ impl DockerService {
 
 pub struct ServiceParam {
     // main params
-    name: String,
-    image: String,
-    network_name: String,
+    pub name: String,
+    pub image: String,
+    pub network_name: String,
 
     // container params
-    labels: HashMap<String, String>,
-    exposed_ports: HashMap<u16, u16>,
-    envs: HashMap<String, String>,
-    mounts: Vec<ServiceMount>,
-    args: Vec<String>,
+    pub labels: HashMap<String, String>,
+    pub exposed_ports: HashMap<u16, u16>,
+    pub envs: HashMap<String, String>,
+    pub mounts: Vec<ServiceMount>,
+    pub args: Vec<String>,
 
     // swarm params
-    cpu: f64,
-    memory: u32,
-    replicas: u8,
-    constraints: Vec<String>,
+    pub cpu: f64,
+    pub memory: u32,
+    pub replicas: u8,
+    pub constraints: Vec<String>,
 }
 
 #[derive(Clone, Debug)]

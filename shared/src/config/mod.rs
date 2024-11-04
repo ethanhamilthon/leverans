@@ -27,7 +27,10 @@ pub struct AppConfig {
     pub domain: Option<String>,
     pub port: Option<u16>,
     pub path_prefix: Option<String>,
-    pub env: Option<HashMap<String, String>>,
+    pub envs: Option<HashMap<String, String>>,
+    pub args: Option<Vec<String>>,
+    pub volumes: Option<HashMap<String, String>>,
+    pub mounts: Option<HashMap<String, String>>,
 }
 
 #[skip_serializing_none]
@@ -37,6 +40,10 @@ pub struct DbConfig {
     pub username: Option<String>,
     pub password: Option<String>,
     pub dbname: Option<String>,
+    pub envs: Option<HashMap<String, String>>,
+    pub args: Option<Vec<String>>,
+    pub volumes: Option<HashMap<String, String>>,
+    pub mounts: Option<HashMap<String, String>>,
 }
 
 // Реализуем трейт Display вручную
@@ -60,9 +67,10 @@ pub struct ServiceConfig {
     pub domain: Option<String>,
     pub port: Option<u16>,
     pub path_prefix: Option<String>,
-    pub env: Option<HashMap<String, String>>,
+    pub envs: Option<HashMap<String, String>>,
     pub args: Option<Vec<String>>,
     pub volumes: Option<HashMap<String, String>>,
+    pub mounts: Option<HashMap<String, String>>,
 }
 
 impl FromStr for MainConfig {

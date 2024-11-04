@@ -7,6 +7,7 @@ use std::{
 pub mod config;
 pub mod config_process;
 pub mod console;
+pub mod deployable;
 pub mod docker;
 pub mod docker_platform;
 pub mod rollup;
@@ -101,7 +102,7 @@ pub struct Secret {
     pub created_at: String,
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SecretValue {
     pub key: String,
     pub value: String,
