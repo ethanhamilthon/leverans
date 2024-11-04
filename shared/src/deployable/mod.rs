@@ -10,9 +10,7 @@ use crate::{
         service::{ServiceMount, ServiceParam},
         DockerService,
     },
-    err, ok,
-    rollup::rollupables::EnvValues,
-    SecretValue,
+    err, ok, SecretValue, SmartString,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -141,7 +139,7 @@ impl Deployable {
 
         // Override default settings
         let image_name = match config.from.as_str() {
-            "postgres" => {
+            "postgres" | "pg" | "postgresql" => {
                 envs =
                     get_default_envs("postgres").ok_or(anyhow!("No default envs for postgres"))?;
                 volumes.insert(
@@ -158,8 +156,8 @@ impl Deployable {
                 );
                 "mysql".to_string()
             }
-            _ => {
-                err!(anyhow!("Invalid database type"))
+            typ => {
+                err!(anyhow!("Invalid database type, your type is {}", typ))
             }
         };
         let user_envs = final_envs(config.envs, connectables, secrets);
@@ -188,21 +186,24 @@ impl Deployable {
         docker: DockerService,
         service_names: Vec<String>,
         network_name: String,
+        is_https: bool,
     ) -> Result<()> {
+        println!("Deploying {}", self.service_name);
+        dbg!(self);
         if service_names.contains(&self.service_name) {
             docker
-                .update_service(self.to_docker_params(network_name)?)
+                .update_service(self.to_docker_params(network_name, is_https)?)
                 .await?;
             ok!(())
         } else {
             docker
-                .create_service(self.to_docker_params(network_name)?)
+                .create_service(self.to_docker_params(network_name, is_https)?)
                 .await?;
             ok!(())
         }
     }
 
-    pub fn to_docker_params(&self, network_name: String) -> Result<ServiceParam> {
+    pub fn to_docker_params(&self, network_name: String, is_https: bool) -> Result<ServiceParam> {
         let mut service_mounts = vec![];
 
         for (k, v) in &self.volumes {
@@ -216,7 +217,7 @@ impl Deployable {
             name: self.service_name.clone(),
             image: self.docker_image.clone(),
             network_name: network_name,
-            labels: self.get_labels(),
+            labels: self.get_labels(is_https),
             exposed_ports: HashMap::new(),
             envs: self.envs.clone(),
             mounts: service_mounts,
@@ -228,8 +229,11 @@ impl Deployable {
         })
     }
 
-    pub fn get_labels(&self) -> HashMap<String, String> {
+    pub fn get_labels(&self, is_https: bool) -> HashMap<String, String> {
         let mut labels = HashMap::new();
+        if self.proxies.is_empty() {
+            return labels;
+        }
         labels.insert("traefik.enable".into(), "true".into());
         let first_proxy = &self
             .proxies
@@ -258,14 +262,21 @@ impl Deployable {
             ),
             port.to_string(),
         );
-        labels.insert(
-            format!("traefik.http.routers.{}.tls", host.clone()),
-            "true".into(),
-        );
-        labels.insert(
-            format!("traefik.http.routers.{}.entrypoints", host.clone()),
-            "websecure".into(),
-        );
+        if is_https {
+            labels.insert(
+                format!("traefik.http.routers.{}.tls", host.clone()),
+                "true".into(),
+            );
+            labels.insert(
+                format!("traefik.http.routers.{}.entrypoints", host.clone()),
+                "websecure".into(),
+            );
+        } else {
+            labels.insert(
+                format!("traefik.http.routers.{}.entrypoints", host.clone()),
+                "web".into(),
+            );
+        }
         labels
     }
 }
@@ -283,7 +294,7 @@ pub fn get_default_envs(service: &str) -> Option<HashMap<String, String>> {
             );
             Some(envs)
         }
-        "postgres" => {
+        "postgres" | "pg" | "postgresql" => {
             let mut envs = HashMap::new();
             envs.insert("POSTGRES_DB".to_string(), "mydb".to_string());
             envs.insert("POSTGRES_USER".to_string(), "mypguser".to_string());
@@ -299,36 +310,40 @@ pub fn final_envs(
     connectables: Vec<Connectable>,
     secrets: Vec<SecretValue>,
 ) -> HashMap<String, String> {
+    if envs.is_none() {
+        println!("No envs found");
+        return HashMap::new();
+    }
+    dbg!(&envs);
     let final_envs: HashMap<String, String> = envs
         .unwrap()
         .into_iter()
-        .map(|(key, value)| (key, EnvValues::parse_env(&value).ok()))
-        .filter(|(_, v)| v.is_some())
-        .map(|(k, v)| (k, v.unwrap()))
+        .map(|(key, value)| (key, SmartString::parse_env(&value).ok()))
         .map(|(k, v)| {
+            let v = v.unwrap_or(SmartString::Text("not found".to_string()));
             let final_value = match v {
-                EnvValues::This { service, method } => {
+                SmartString::This { service, method } => {
                     let connectable = connectables.iter().find(|c| c.short_name == service);
                     match method.as_str() {
                         "connection" | "conn" => {
                             if let Some(connectable) = connectable {
                                 connectable.connection.clone().unwrap_or("".to_string())
                             } else {
-                                "".to_string()
+                                "connectable not found".to_string()
                             }
                         }
                         "internal" | "link" | "url" => {
                             if let Some(connectable) = connectable {
                                 connectable.internal_link.clone().unwrap_or("".to_string())
                             } else {
-                                "".to_string()
+                                "connectable not found".to_string()
                             }
                         }
                         _ => "".to_string(),
                     }
                 }
-                EnvValues::Text(text) => text,
-                EnvValues::Secret(secret_key) => secrets
+                SmartString::Text(text) => text,
+                SmartString::Secret(secret_key) => secrets
                     .iter()
                     .find(|s| s.key == secret_key)
                     .map(|s| s.value.clone())
@@ -395,7 +410,7 @@ impl Connectable {
 
     pub fn from_db_config(name: String, config: DbConfig, project_name: String) -> Result<Self> {
         let connection = match config.from.as_str() {
-            "postgres" => {
+            "postgres" | "pg" | "postgresql" => {
                 let default_envs =
                     get_default_envs("postgres").ok_or(anyhow!("No default envs for postgres"))?;
                 let user_envs = config.envs.unwrap_or(HashMap::new());
@@ -437,8 +452,8 @@ impl Connectable {
                     dbname
                 ))
             }
-            _ => {
-                err!(anyhow!("Invalid database type"))
+            typ => {
+                err!(anyhow!("Invalid database type, your type is {}", typ))
             }
         };
         let internal_link = None;
@@ -468,4 +483,41 @@ impl Connectable {
             internal_link
         })
     }
+}
+
+#[test]
+fn dep_test() {
+    let dep1 = Deployable {
+        short_name: String::from("dep1"),
+        project_name: String::from("dep1"),
+        config_type: String::from("dep1"),
+        service_name: String::from("dep1"),
+        docker_image: String::from("dep1"),
+        proxies: vec![],
+        envs: HashMap::from([("ENV".to_string(), "VALUE1".to_string())]),
+        volumes: HashMap::new(),
+        mounts: HashMap::new(),
+        args: vec![],
+        depends_on: None,
+        replicas: 1,
+    };
+
+    let dep_vec = vec![dep1.clone(), dep1.clone()];
+
+    let dep2 = Deployable {
+        short_name: String::from("dep1"),
+        project_name: String::from("dep1"),
+        config_type: String::from("dep1"),
+        service_name: String::from("dep1"),
+        docker_image: String::from("dep1"),
+        proxies: vec![],
+        envs: HashMap::from([("ENV".to_string(), "VALUE".to_string())]),
+        volumes: HashMap::new(),
+        mounts: HashMap::new(),
+        args: vec![],
+        depends_on: None,
+        replicas: 1,
+    };
+
+    assert!(dep_vec.contains(&dep2));
 }

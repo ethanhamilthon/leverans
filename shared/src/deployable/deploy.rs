@@ -41,6 +41,7 @@ impl Deploy {
                     self.docker.clone(),
                     service_names.clone(),
                     self.network_name.clone(),
+                    !self.is_local,
                 )
                 .await?;
         }
@@ -163,10 +164,16 @@ impl Deploy {
     pub fn updated_deployables(main: Vec<Deployable>, last: Vec<Deployable>) -> Vec<Deployable> {
         let mut deployables = vec![];
         for maind in main {
-            if last.contains(&maind) {
+            println!();
+            println!("looking for {}", maind.short_name);
+            dbg!(&maind);
+            println!();
+            if !last.contains(&maind) {
+                println!("{} will be deployed", maind.short_name);
                 deployables.push(maind);
             }
         }
+        println!("{} to be deployed", deployables.len());
         deployables
     }
 }

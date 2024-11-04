@@ -1,18 +1,19 @@
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use shared::ok;
-use sqlx::{query, query_as, Executor, SqlitePool};
+use sqlx::{prelude::FromRow, query, query_as, Executor, SqlitePool};
 use uuid::Uuid;
 
 pub const CONFIG_MIGRATION: &str = r#"
     create table if not exists configs (
         id text primary key,
         name text not null,
-        config text not null
+        config text not null,
         created_at text not null
     );
     "#;
 
+#[derive(Debug, serde::Serialize, serde::Deserialize, FromRow)]
 pub struct ConfigData {
     pub id: String,
     pub name: String,

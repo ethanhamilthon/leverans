@@ -5,12 +5,10 @@ use std::{
 };
 
 pub mod config;
-pub mod config_process;
 pub mod console;
 pub mod deployable;
 pub mod docker;
 pub mod docker_platform;
-pub mod rollup;
 
 #[macro_export]
 macro_rules! err {
@@ -106,4 +104,42 @@ pub struct Secret {
 pub struct SecretValue {
     pub key: String,
     pub value: String,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum SmartString {
+    This { service: String, method: String },
+    Text(String),
+    Secret(String),
+}
+
+impl SmartString {
+    pub fn parse_env<'a>(value: &'a str) -> Result<SmartString> {
+        if value.chars().count() < 4 {
+            ok!(SmartString::Text(value.to_string()))
+        }
+        let value = value.trim();
+        let first_2_char = &value[..2];
+        let last_2_char = &value[value.len() - 2..value.len()];
+        if first_2_char == "{{" && last_2_char == "}}" {
+            let value = &value[2..value.len() - 2].trim();
+            if let Some(env_value) = value.strip_prefix("secret.") {
+                ok!(SmartString::Secret(env_value.to_string()))
+            }
+            if let Some(env_value) = value.strip_prefix("this.") {
+                let parts: Vec<&str> = env_value.splitn(2, '.').collect();
+                if parts.len() != 2 {
+                    err!(anyhow!(
+                        "after \"this\" should be two arguments divided with \".\""
+                    ))
+                }
+                ok!(SmartString::This {
+                    service: parts[0].to_string(),
+                    method: parts[1].to_string()
+                })
+            }
+            err!(anyhow!("please use \"this\" or \"secret\""))
+        }
+        ok!(SmartString::Text(value.to_string()))
+    }
 }
