@@ -18,11 +18,17 @@ impl API {
         })
     }
 
-    pub async fn upload_config(&self, config: String, token: String) -> Result<()> {
+    pub async fn upload_config(
+        &self,
+        config: String,
+        token: String,
+        filter: Option<String>,
+    ) -> Result<()> {
         let mut upload_url = self.main_url.clone();
         upload_url.set_path("/deploy");
         let body = json!({
-            "config": config
+            "config": config,
+            "filter": filter
         })
         .to_string();
         let res = self

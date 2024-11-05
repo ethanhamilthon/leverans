@@ -16,6 +16,7 @@ use super::ServerData;
 #[derive(Deserialize, Debug)]
 pub struct ConfigBody {
     pub config: String,
+    pub filter: Option<String>,
 }
 
 pub async fn new_deploy_handle(
@@ -25,6 +26,7 @@ pub async fn new_deploy_handle(
 ) -> Result<impl Responder> {
     println!("deploying new handler");
     println!("{:?}", body);
+    println!("with filter : {}", body.filter.is_some());
     must_auth(&req)?;
     let project_name = MainConfig::from_str(&body.config)
         .map_err(|e| InternalError::new(e, StatusCode::from_u16(400).unwrap()))?
@@ -58,13 +60,14 @@ pub async fn new_deploy_handle(
         docker: sd.docker_service.clone(),
         is_local: true,
         network_name: "lev".to_string(),
+        filter: body.filter.clone(),
     }
     .deploy()
     .await;
     match deploy_res {
-        Ok(_) => {
+        Ok(deps) => {
             println!("Deployed successfully");
-            ConfigData::new(project_name, body.config.clone())
+            ConfigData::new(project_name, deps)
                 .map_err(|e| InternalError::new(e, StatusCode::from_u16(500).unwrap()))?
                 .insert_db(&sd.repo.pool)
                 .await

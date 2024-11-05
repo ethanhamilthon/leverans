@@ -22,14 +22,6 @@ pub async fn handle_deploy(
     no_build: bool,
     filter: Option<String>,
 ) -> Result<()> {
-    if no_build {
-        println!("👾 No build Building...: {}", no_build);
-        ok!(())
-    }
-    if filter.is_some() {
-        println!("👾 Filtering...: {}", filter.unwrap());
-        ok!(())
-    }
     let abs_path = fs::canonicalize(Path::new(&context_path))?;
     let config_path = abs_path.join(&file_name);
     let user = UserData::load_db(false).await?.load_current_user().await?;
@@ -45,7 +37,7 @@ pub async fn handle_deploy(
             remote_platform: get_docker_platform().ok(),
             main_config: MainConfig::from_str(&raw_config).map_err(|_| anyhow!("invalid yaml"))?,
             token: user.remote_token.clone(),
-            filter,
+            filter: filter.clone(),
         };
         build_images(builder).await?;
     }
@@ -56,7 +48,7 @@ pub async fn handle_deploy(
         .await?
         .remote_url;
     API::new(&remote_url)?
-        .upload_config(raw_config, user.remote_token)
+        .upload_config(raw_config, user.remote_token, filter)
         .await?;
     println!("✅ Deployed!\n");
     ok!(())

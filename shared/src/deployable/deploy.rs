@@ -12,10 +12,11 @@ pub struct Deploy {
     pub docker: DockerService,
     pub is_local: bool,
     pub network_name: String,
+    pub filter: Option<String>,
 }
 
 impl Deploy {
-    pub async fn deploy(&self) -> Result<()> {
+    pub async fn deploy(&self) -> Result<String> {
         let all_images: Vec<String> = self
             .docker
             .list_images()
@@ -24,10 +25,22 @@ impl Deploy {
             .map(|e| e.tag)
             .collect();
         let main_deployables =
-            self.config_to_deployable("main", self.config_to_connectable("main")?, &all_images)?;
-        let last_deployables =
-            self.config_to_deployable("last", self.config_to_connectable("last")?, &all_images)?;
-        let deployables = Self::updated_deployables(main_deployables, last_deployables);
+            self.config_to_deployable(self.config_to_connectable()?, &all_images)?;
+        let mut last_deployables = if self.last_config.is_some() {
+            serde_json::from_str::<Vec<Deployable>>(&self.last_config.clone().unwrap())?
+        } else {
+            vec![]
+        };
+        let deployables = if self.filter.is_some() {
+            let filter = self.filter.clone().unwrap();
+            main_deployables
+                .iter()
+                .filter(|d| d.short_name == filter)
+                .map(|d| d.clone())
+                .collect::<Vec<_>>()
+        } else {
+            Self::updated_deployables(main_deployables.clone(), last_deployables.clone())
+        };
         let service_names: Vec<String> = self
             .docker
             .list_services()
@@ -35,7 +48,7 @@ impl Deploy {
             .into_iter()
             .map(|s| s.spec.unwrap().name.unwrap())
             .collect();
-        for deployable in deployables {
+        for deployable in &deployables {
             deployable
                 .deploy(
                     self.docker.clone(),
@@ -45,31 +58,32 @@ impl Deploy {
                 )
                 .await?;
         }
-        Ok(())
+        if self.filter.is_some() {
+            if let Some(th_deployable) = last_deployables
+                .iter_mut()
+                .find(|d| d.short_name == self.filter.clone().unwrap())
+            {
+                if deployables.len() == 1 {
+                    *th_deployable = deployables[0].clone();
+                }
+            } else {
+                last_deployables.push(deployables[0].clone());
+            }
+
+            let res = serde_json::to_string(&last_deployables)?;
+            ok!(res)
+        } else {
+            Ok(serde_json::to_string(&main_deployables)?)
+        }
     }
 
     pub fn config_to_deployable(
         &self,
-        version: &str,
         connectables: Vec<Connectable>,
         images: &[String],
     ) -> Result<Vec<Deployable>> {
-        if version == "last" && self.last_config.is_none() {
-            return Ok(vec![]);
-        }
-        let config = match version {
-            "last" => {
-                let config = MainConfig::from_str(&self.last_config.clone().unwrap())
-                    .map_err(|_| anyhow!("cannot parse last config"))?;
-                config
-            }
-            "main" => {
-                let config = MainConfig::from_str(&self.main_config)
-                    .map_err(|_| anyhow!("cannot parse last config"))?;
-                config
-            }
-            _ => return Err(anyhow!("unknown version {}", version)),
-        };
+        let config = MainConfig::from_str(&self.main_config)
+            .map_err(|_| anyhow!("cannot parse last config"))?;
         let mut deployables = vec![];
         if let Some(apps) = config.app {
             for (app_name, app) in apps {
@@ -110,24 +124,9 @@ impl Deploy {
         ok!(deployables)
     }
 
-    pub fn config_to_connectable(&self, version: &str) -> Result<Vec<Connectable>> {
-        if version == "last" && self.last_config.is_none() {
-            return Ok(vec![]);
-        }
-        let config = match version {
-            "last" => {
-                let config = MainConfig::from_str(&self.last_config.clone().unwrap())
-                    .map_err(|_| anyhow!("cannot parse last config"))?;
-                config
-            }
-            "main" => {
-                let config = MainConfig::from_str(&self.main_config)
-                    .map_err(|_| anyhow!("cannot parse last config"))?;
-                config
-            }
-            _ => return Err(anyhow!("unknown version {}", version)),
-        };
-
+    pub fn config_to_connectable(&self) -> Result<Vec<Connectable>> {
+        let config = MainConfig::from_str(&self.main_config)
+            .map_err(|_| anyhow!("cannot parse last config"))?;
         let mut connectables = vec![];
         if let Some(apps) = config.app {
             for (app_name, app) in apps {

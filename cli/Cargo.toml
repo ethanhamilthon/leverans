@@ -3,6 +3,10 @@ name = "lev"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "lev"
+path = "src/main.rs"
+
 [dependencies]
 reqwest = { version = "0.12.8", features = ["multipart", "stream"]}
 shared = { path = "../shared" }

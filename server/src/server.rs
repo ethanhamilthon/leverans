@@ -72,7 +72,7 @@ pub async fn start_server(server: ServerData) -> std::io::Result<()> {
             .route("/secret", web::post().to(handle_add_secret))
             .route("/secret", web::get().to(handle_list_secrets))
     })
-    .bind(("127.0.0.1", port))?
+    .bind(("0.0.0.0", port))?
     .run()
     .await
 }

@@ -3,6 +3,10 @@ name = "server"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "server"
+path = "src/main.rs"
+
 [dependencies]
 actix-multipart = "0.7.2"
 actix-web = "4.9.0"
@@ -13,6 +17,7 @@ futures = "0.3.31"
 futures-util = "0.3.31"
 jsonwebtoken = "9.3.0"
 proc-macro2 = "1.0.87"
+rand = "0.8.5"
 serde = "1.0.210"
 shared = { path = "../shared" }
 sqlx = { version = "0.8", features = [ "runtime-tokio", "tls-native-tls", "sqlite" ] }

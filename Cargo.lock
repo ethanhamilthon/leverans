@@ -2630,6 +2630,7 @@ dependencies = [
  "futures-util",
  "jsonwebtoken",
  "proc-macro2",
+ "rand",
  "serde",
  "shared",
  "sqlx",

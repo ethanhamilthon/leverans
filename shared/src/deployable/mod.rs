@@ -3,6 +3,7 @@ pub mod deploy;
 use std::collections::HashMap;
 
 use anyhow::{anyhow, Result};
+use serde::{Deserialize, Serialize};
 
 use crate::{
     config::{AppConfig, DbConfig, ServiceConfig},
@@ -13,7 +14,7 @@ use crate::{
     err, ok, SecretValue, SmartString,
 };
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct Deployable {
     // just name of the deployable, without the project name
     pub short_name: String,
@@ -35,7 +36,7 @@ pub struct Deployable {
     pub replicas: u32,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct ProxyParams {
     pub port: u16,
     pub path_prefix: String,
