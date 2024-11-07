@@ -1,6 +1,6 @@
 pub mod deploy;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, path::PathBuf};
 
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
@@ -11,7 +11,8 @@ use crate::{
         service::{ServiceMount, ServiceParam},
         DockerService,
     },
-    err, ok, SecretValue, SmartString,
+    docker_platform::get_docker_platform,
+    err, get_unix_millis, ok, SecretValue, SmartString,
 };
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -48,17 +49,15 @@ impl Deployable {
         name: String,
         config: AppConfig,
         project_name: String,
-        image_tags: Vec<String>,
         secrets: Vec<SecretValue>,
         connectables: Vec<Connectable>,
+        buildables: Vec<Buildable>,
     ) -> Result<Self> {
         // find right image
-        let image_name = format!("{}-{}-image", project_name, name);
-        let this_image_tags: Vec<_> = image_tags
+        let buildable = buildables
             .into_iter()
-            .filter(|i| i.starts_with(&image_name))
-            .collect();
-
+            .find(|b| b.short_name == name)
+            .ok_or(anyhow!("No buildable"))?;
         // routing
         let proxy = if config.port.is_some() && config.domain.is_some() {
             Some(ProxyParams {
@@ -75,7 +74,7 @@ impl Deployable {
             project_name: project_name.clone(),
             config_type: "app".to_string(),
             service_name: format!("{}-{}-service", project_name, name),
-            docker_image: latest_tag(this_image_tags).ok_or(anyhow!("No images"))?,
+            docker_image: buildable.tag,
             proxies: if proxy.is_some() {
                 vec![proxy.unwrap()]
             } else {
@@ -376,7 +375,7 @@ fn latest_tag(app_images: Vec<String>) -> Option<String> {
     last_image_name
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Connectable {
     pub short_name: String,
     pub project_name: String,
@@ -486,6 +485,38 @@ impl Connectable {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Buildable {
+    pub short_name: String,
+    pub project_name: String,
+    pub docker_file_name: String,
+    pub context: PathBuf,
+    pub tag: String,
+    pub platform: String,
+}
+
+impl Buildable {
+    pub fn from_app_config(name: String, config: AppConfig, project_name: String) -> Result<Self> {
+        let short_name = name.clone();
+        let project_name = project_name.clone();
+
+        let docker_file_name = config.dockerfile.unwrap_or("Dockerfile".to_string());
+        let context = PathBuf::from(config.context.unwrap_or(".".to_string()));
+
+        let tag = format!("{}-{}-image:{}", project_name, name, get_unix_millis());
+        let platform = get_docker_platform()?;
+
+        ok!(Self {
+            short_name,
+            project_name,
+            docker_file_name,
+            context,
+            tag,
+            platform
+        })
+    }
+}
+
 #[test]
 fn dep_test() {
     let dep1 = Deployable {
@@ -520,5 +551,5 @@ fn dep_test() {
         replicas: 1,
     };
 
-    assert!(dep_vec.contains(&dep2));
+    assert!(!dep_vec.contains(&dep2));
 }

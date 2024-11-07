@@ -4,7 +4,7 @@ use actix_web::{
     error::InternalError, http::StatusCode, web, HttpRequest, HttpResponse, Responder, Result,
 };
 use serde::Deserialize;
-use shared::{config::MainConfig, deployable::deploy::Deploy, ok, SecretValue};
+use shared::{config::MainConfig, deployable::deploy::DeployParameters, ok, SecretValue};
 
 use crate::{
     repo::{config_repo::ConfigData, secret_repo::SecretData},
@@ -53,7 +53,7 @@ pub async fn new_deploy_handle(
             value: s.value,
         })
         .collect();
-    let deploy_res = Deploy {
+    let deploy_res = DeployParameters {
         main_config: body.config.clone(),
         last_config: last_config.map(|c| c.config),
         secrets: secret_list,

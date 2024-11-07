@@ -2,6 +2,7 @@ use anyhow::{anyhow, Result};
 use std::{
     fs,
     path::{Path, PathBuf},
+    time::{SystemTime, UNIX_EPOCH},
 };
 
 pub mod config;
@@ -142,4 +143,11 @@ impl SmartString {
         }
         ok!(SmartString::Text(value.to_string()))
     }
+}
+
+pub fn get_unix_millis() -> u128 {
+    let now = SystemTime::now();
+    now.duration_since(UNIX_EPOCH)
+        .expect("Time went backwards")
+        .as_millis()
 }

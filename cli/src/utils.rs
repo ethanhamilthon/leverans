@@ -3,7 +3,8 @@ use shared::ok;
 use std::{
     fs,
     io::{Read, Write},
-    time::{SystemTime, UNIX_EPOCH},
+    thread::{sleep, sleep_ms},
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 pub fn open_file_as_string(path: &str) -> Result<String> {
@@ -40,6 +41,7 @@ fn test_unix_seconds() {
     let seconds = get_unix_seconds();
     assert_ne!(seconds, 0);
 
+    sleep(Duration::from_secs(1));
     let seconds2 = get_unix_seconds();
     assert!(seconds != seconds2);
 }
