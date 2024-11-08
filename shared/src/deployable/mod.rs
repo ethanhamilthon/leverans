@@ -268,6 +268,10 @@ impl Deployable {
                 "true".into(),
             );
             labels.insert(
+                format!("traefik.http.routers.{}.tls.certresolver", host.clone()),
+                "myresolver".into(),
+            );
+            labels.insert(
                 format!("traefik.http.routers.{}.entrypoints", host.clone()),
                 "websecure".into(),
             );
@@ -355,24 +359,6 @@ pub fn final_envs(
         .collect();
 
     final_envs
-}
-
-fn latest_tag(app_images: Vec<String>) -> Option<String> {
-    let mut image_longest_time: u64 = 0;
-    let mut last_image_name: Option<String> = None;
-    for image in app_images {
-        let parts: Vec<&str> = image.splitn(2, ":").collect();
-        if parts.is_empty() || parts.len() != 2 {
-            continue;
-        }
-        let image_time: u64 = parts[1].parse().unwrap_or(0);
-        if image_time > image_longest_time {
-            image_longest_time = image_time;
-            last_image_name = Some(parts.join(":"));
-        }
-    }
-
-    last_image_name
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

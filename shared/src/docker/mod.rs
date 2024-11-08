@@ -13,7 +13,7 @@ pub struct DockerService {
 
 impl DockerService {
     pub fn new() -> Result<Self> {
-        println!("Connecting docker");
+        //println!("Connecting docker");
         Ok(DockerService {
             conn: Arc::new(Docker::connect_with_socket_defaults()?),
         })

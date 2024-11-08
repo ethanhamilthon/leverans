@@ -1,5 +1,6 @@
 use std::{
     fs,
+    io::{stdin, stdout, Write},
     path::{Path, PathBuf},
     str::FromStr,
 };
@@ -8,48 +9,47 @@ use anyhow::{anyhow, Result};
 use shared::{
     config::MainConfig, docker::DockerService, docker_platform::get_docker_platform, err, ok,
 };
+use tokio::time::sleep;
 
 use crate::{
     api::API,
-    data::UserData,
-    handlers::build_handle::{build_images, BuildParams},
-    utils::open_file_as_string,
+    handlers::build_handle::{new_build_images, upload_images},
 };
 
-pub async fn handle_deploy(
+use super::plan_handle::handle_plan;
+
+pub async fn new_handle_deploy(
     file_name: String,
-    context_path: String,
+    context: String,
     no_build: bool,
     filter: Option<String>,
+    only: Option<Vec<String>>,
 ) -> Result<()> {
-    let abs_path = fs::canonicalize(Path::new(&context_path))?;
-    let config_path = abs_path.join(&file_name);
-    let user = UserData::load_db(false).await?.load_current_user().await?;
-    let raw_config = open_file_as_string(
-        config_path
-            .to_str()
-            .ok_or(anyhow!("failed to convert path to string"))?,
-    )?;
-    if !no_build {
-        let builder = BuildParams {
-            docker: DockerService::new()?,
-            abs_path: abs_path.clone(),
-            remote_platform: get_docker_platform().ok(),
-            main_config: MainConfig::from_str(&raw_config).map_err(|_| anyhow!("invalid yaml"))?,
-            token: user.remote_token.clone(),
-            filter: filter.clone(),
-        };
-        build_images(builder).await?;
+    let (user, deploys) = handle_plan(filter, only, file_name, context.clone(), no_build).await?;
+    let mut confirm = String::new();
+    print!("These are all the tasks that will be deployed. Please confirm (y/n): ");
+    stdout().flush()?;
+    stdin()
+        .read_line(&mut confirm)
+        .map_err(|e| anyhow!("Error on reading confirmation {}", e))?;
+    confirm = confirm.trim().to_string();
+
+    if confirm != "y" {
+        err!(anyhow!("Aborted, no changes were made"));
     }
-    println!("👾 Deploying...");
-    let remote_url = UserData::load_db(false)
-        .await?
-        .load_current_user()
-        .await?
-        .remote_url;
-    API::new(&remote_url)?
-        .upload_config(raw_config, user.remote_token, filter)
+
+    let docker = DockerService::new()?;
+    let abs_path = fs::canonicalize(Path::new(&context))?;
+    let built_app_names = new_build_images(deploys.clone(), abs_path, docker.clone()).await?;
+    upload_images(docker, built_app_names, user.remote_token.clone()).await?;
+
+    sleep(std::time::Duration::from_millis(1000)).await;
+    println!("Deploying...");
+    stdout().flush()?;
+    API::new(&user.remote_url)?
+        .deploy_plan(deploys, user.remote_token)
         .await?;
-    println!("✅ Deployed!\n");
+    println!("Deployed!\n");
+    stdout().flush()?;
     ok!(())
 }

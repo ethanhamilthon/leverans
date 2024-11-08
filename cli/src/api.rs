@@ -2,7 +2,7 @@ use reqwest::{multipart::Form, StatusCode};
 use serde_json::{self, json};
 
 use anyhow::{anyhow, Result};
-use shared::{err, ok, Secret, UserAuthBody};
+use shared::{deployable::deploy::Deploy, err, ok, Secret, UserAuthBody};
 use url::Url;
 
 pub struct API {
@@ -12,9 +12,14 @@ pub struct API {
 
 impl API {
     pub fn new(url: &str) -> Result<Self> {
+        //println!("Connected to {}", url);
         Ok(API {
             main_url: Url::parse(url)?,
-            req_client: reqwest::Client::new(),
+            req_client: reqwest::Client::builder()
+                .danger_accept_invalid_certs(true) // Отключаем проверку сертификатов
+                .timeout(std::time::Duration::from_secs(60))
+                .build()
+                .unwrap(),
         })
     }
 
@@ -46,6 +51,62 @@ impl API {
         } else {
             let error_text = res.text().await?;
             Err(anyhow!("Failed to upload config: {}", error_text))
+        }
+    }
+
+    pub async fn deploy_plan(&self, deploys: Vec<Deploy>, token: String) -> Result<()> {
+        let mut upload_url = self.main_url.clone();
+        upload_url.set_path("/new-deploy");
+
+        let body = serde_json::to_string(&deploys)?;
+        //println!("{}", body);
+        let res = self
+            .req_client
+            .post(upload_url)
+            .body(body)
+            .header("Content-Type", "application/json")
+            .header("X-LEVERANS-PASS", "true")
+            .header("Authorization", token)
+            .send()
+            .await?;
+
+        if res.status().is_success() {
+            Ok(())
+        } else {
+            let error_text = res.text().await?;
+            Err(anyhow!("Failed to deploy plan: {}", error_text))
+        }
+    }
+
+    pub async fn get_plans(
+        &self,
+        config: String,
+        token: String,
+        filter: Option<Vec<String>>,
+    ) -> Result<Vec<Deploy>> {
+        let mut upload_url = self.main_url.clone();
+        upload_url.set_path("/plan");
+        let body = json!({
+            "config": config,
+            "filter": filter
+        })
+        .to_string();
+        let res = self
+            .req_client
+            .get(upload_url)
+            .body(body)
+            .header("Content-Type", "application/json")
+            .header("X-LEVERANS-PASS", "true")
+            .header("Authorization", token)
+            .send()
+            .await?;
+
+        if res.status().is_success() {
+            let plans = serde_json::from_str::<Vec<Deploy>>(&res.text().await?)?;
+            Ok(plans)
+        } else {
+            let error_text = res.text().await?;
+            Err(anyhow!("Failed to get plans: {}", error_text))
         }
     }
 
@@ -201,4 +262,19 @@ impl API {
             Err(anyhow!("Failed to list secret: {}", error_text))
         }
     }
+}
+
+#[tokio::test]
+async fn health_test() {
+    let client = reqwest::client::builder()
+        .danger_accept_invalid_certs(true) // отключаем проверку сертификатов
+        .build()
+        .unwrap();
+    let res = client
+        .get("https://localhost/healthz")
+        .header("X-LEVERANS-PASS", "true")
+        .send()
+        .await
+        .unwrap();
+    assert!(res.status().is_success());
 }

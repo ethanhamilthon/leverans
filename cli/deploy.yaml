@@ -1,0 +1,13 @@
+project: mypro
+
+app:
+  next-app:
+    port: 3000
+    domain: "my-next.com"
+    envs:
+      PG_CONNECTION: "{{ this.mypg.connection }}"
+
+db:
+  mypg:
+    from: pg
+

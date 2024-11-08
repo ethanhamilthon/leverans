@@ -9,11 +9,12 @@ use actix_web::{
 };
 use anyhow::anyhow;
 use auth_handler::{handle_is_super_user_exists, login_user, register_super_user};
-use deploy_handler::new_deploy_handle;
+use deploy_handler::{handle_deploy, new_deploy_handle};
 use docker_handler::{list_images, upload};
 use futures::FutureExt;
 use futures_util::future::{ready, Ready};
 use healthz_handler::handle_healthz;
+use plan_handler::handle_plan;
 use secret_handler::{handle_add_secret, handle_list_secrets};
 use shared::docker::DockerService;
 
@@ -23,6 +24,7 @@ pub mod auth_handler;
 pub mod deploy_handler;
 pub mod docker_handler;
 pub mod healthz_handler;
+pub mod plan_handler;
 pub mod secret_handler;
 
 #[derive(Debug, Clone)]
@@ -35,10 +37,11 @@ pub struct ServerData {
 impl ServerData {
     pub async fn new(port: u16) -> ServerData {
         dbg!("Starting server on port: {}", port);
+        let dbpath = std::env::var("DBPATH").unwrap();
         ServerData {
             port,
             docker_service: DockerService::new().unwrap(),
-            repo: Repo::new("main.db", false).await.unwrap(),
+            repo: Repo::new(&dbpath, false).await.unwrap(),
         }
     }
 }
@@ -64,6 +67,8 @@ pub async fn start_server(server: ServerData) -> std::io::Result<()> {
             .app_data(web::Data::new(server))
             .route("/upload_image", web::post().to(upload))
             .route("/deploy", web::post().to(new_deploy_handle))
+            .route("/new-deploy", web::post().to(handle_deploy))
+            .route("/plan", web::get().to(handle_plan))
             .route("/list_images", web::get().to(list_images))
             .route("/healthz", web::get().to(handle_healthz))
             .route("/auth/super", web::get().to(handle_is_super_user_exists))

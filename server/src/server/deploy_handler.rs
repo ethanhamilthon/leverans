@@ -4,10 +4,14 @@ use actix_web::{
     error::InternalError, http::StatusCode, web, HttpRequest, HttpResponse, Responder, Result,
 };
 use serde::Deserialize;
-use shared::{config::MainConfig, deployable::deploy::DeployParameters, ok, SecretValue};
+use shared::{
+    config::MainConfig,
+    deployable::deploy::{Deploy, DeployParameters},
+    err, ok, SecretValue,
+};
 
 use crate::{
-    repo::{config_repo::ConfigData, secret_repo::SecretData},
+    repo::{config_repo::ConfigData, deploy_repo::DeployData, secret_repo::SecretData},
     server::auth_handler::{check_auth, must_auth},
 };
 
@@ -79,4 +83,43 @@ pub async fn new_deploy_handle(
             Ok(HttpResponse::InternalServerError().body(format!("Failed to deploy: {:?}", e)))
         }
     }
+}
+
+pub async fn handle_deploy(
+    sd: web::Data<Arc<ServerData>>,
+    body: web::Json<Vec<Deploy>>,
+    req: HttpRequest,
+) -> Result<impl Responder> {
+    must_auth(&req)?;
+    let mut project_name: String = String::new();
+    for deploy in body.iter() {
+        if !project_name.is_empty() && project_name != deploy.deployable.project_name.clone() {
+            err!(InternalError::new(
+                "All deploys must be from the same project",
+                StatusCode::from_u16(400).unwrap(),
+            )
+            .into());
+        }
+        project_name = deploy.deployable.project_name.clone();
+        deploy
+            .deploy(sd.docker_service.clone())
+            .await
+            .map_err(|e| {
+                InternalError::new(
+                    format!("Failed to deploy: {:?}", e),
+                    StatusCode::from_u16(500).unwrap(),
+                )
+            })?;
+    }
+    DeployData::new(
+        project_name,
+        serde_json::to_string(&body)
+            .map_err(|e| InternalError::new(e, StatusCode::from_u16(500).unwrap()))?,
+    )
+    .map_err(|e| InternalError::new(e, StatusCode::from_u16(500).unwrap()))?
+    .insert_db(&sd.repo.pool)
+    .await
+    .map_err(|e| InternalError::new(e, StatusCode::from_u16(500).unwrap()))?;
+    println!("Deployed successfully");
+    Ok(HttpResponse::Ok().body("Deployed successfully"))
 }

@@ -1,4 +1,4 @@
-use std::{collections::HashMap, str::FromStr};
+use std::{collections::HashMap, str::FromStr, sync::Arc};
 
 use crate::{config::MainConfig, docker::DockerService, err, ok, SecretValue};
 
@@ -195,6 +195,7 @@ pub struct Deploy {
     pub after_tasks: Vec<DeployTask>,
     pub client_tasks: Vec<DeployTask>,
     pub action: DeployAction,
+    pub network_name: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -216,6 +217,34 @@ pub struct PlanParamaters {
     pub secrets: Vec<SecretValue>,
     pub network_name: String,
     pub filter: Option<Vec<String>>,
+}
+
+impl Deploy {
+    pub async fn deploy(&self, docker: DockerService) -> Result<()> {
+        match self.action {
+            DeployAction::Update => {
+                let docker_params = self
+                    .deployable
+                    .to_docker_params(self.network_name.clone(), true)?;
+                docker.update_service(docker_params).await?;
+                ok!(())
+            }
+            DeployAction::Create => {
+                let docker_params = self
+                    .deployable
+                    .to_docker_params(self.network_name.clone(), true)?;
+                docker.create_service(docker_params).await?;
+                ok!(())
+            }
+            DeployAction::Delete => {
+                docker
+                    .delete_service(self.deployable.service_name.clone())
+                    .await?;
+                ok!(())
+            }
+            DeployAction::Nothing => ok!(()),
+        }
+    }
 }
 
 pub fn plan(params: PlanParamaters) -> Result<Vec<Deploy>> {
@@ -274,6 +303,7 @@ pub fn plan(params: PlanParamaters) -> Result<Vec<Deploy>> {
                     vec![]
                 },
                 action: DeployAction::Nothing,
+                network_name: params.network_name.clone(),
             })
         })
         .collect();

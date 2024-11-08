@@ -86,7 +86,7 @@ impl DockerService {
     }
 
     pub fn save_image(
-        self: Arc<Self>,
+        &self,
         image_name: String,
     ) -> Pin<Box<dyn Stream<Item = Result<Bytes, bollard::errors::Error>> + Send>> {
         Box::pin(self.conn.export_image(&image_name))

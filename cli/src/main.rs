@@ -15,12 +15,9 @@ pub mod utils;
 async fn main() {
     let cli = Lev::parse();
     match handle_routes(cli).await {
-        Ok(_) => {
-            println!();
-            exit(0)
-        }
+        Ok(_) => exit(0),
         Err(e) => {
-            println!("⚠️ {:?}\n", e);
+            println!("{:?}", e);
             exit(1)
         }
     }

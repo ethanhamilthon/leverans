@@ -2632,6 +2632,7 @@ dependencies = [
  "proc-macro2",
  "rand",
  "serde",
+ "serde_json",
  "shared",
  "sqlx",
  "tokio",

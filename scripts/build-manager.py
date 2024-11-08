@@ -10,6 +10,7 @@ def check_command(command, error_message):
 
 def main():
     if len(sys.argv) < 2:
+        print(sys.argv)
         print("Usage: python script.py <version>")
         sys.exit(1)
 

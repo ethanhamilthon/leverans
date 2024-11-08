@@ -23,6 +23,9 @@ pub enum Commands {
         no_build: bool,
 
         filter: Option<String>,
+
+        #[arg(short, long, default_value = None)]
+        only: Option<Vec<String>>,
     },
     Version,
     Auth {
@@ -35,21 +38,24 @@ pub enum Commands {
     },
     Logout,
     Whoami,
-    Docker {
-        #[command(subcommand)]
-        command: DockerCommands,
-    },
     Secret {
         #[command(subcommand)]
         command: SecretCommands,
     },
-}
+    Plan {
+        #[arg(short = 'f', long, default_value = "deploy.yaml")]
+        file: String,
 
-#[derive(Subcommand, Clone)]
-pub enum DockerCommands {
-    Image {
-        #[command(subcommand)]
-        command: DockerImageCommands,
+        #[arg(short = 'c', long, default_value = "./")]
+        context: String,
+
+        #[arg(short = 'n', long, default_value_t = false)]
+        no_build: bool,
+
+        single_filter: Option<String>,
+
+        #[arg(short, long, default_value = None)]
+        only: Option<Vec<String>>,
     },
 }
 

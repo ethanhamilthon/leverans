@@ -21,7 +21,6 @@
     address = ":443"
 
 [certificatesResolvers.myresolver.acme]
-  email = "your-email@example.com" # Укажите свою почту
   storage = "acme.json"             # Файл для хранения сертификатов
   [certificatesResolvers.myresolver.acme.httpChallenge]
     entryPoint = "web"               # Использование HTTP-решения для проверки доменов
