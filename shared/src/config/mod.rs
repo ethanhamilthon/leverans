@@ -22,6 +22,7 @@ pub struct MainConfig {
 #[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AppConfig {
+    pub build: String,
     pub dockerfile: Option<String>,
     pub context: Option<String>,
     pub domain: Option<String>,

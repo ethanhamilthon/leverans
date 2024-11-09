@@ -44,12 +44,12 @@ pub async fn new_handle_deploy(
     upload_images(docker, built_app_names, user.remote_token.clone()).await?;
 
     sleep(std::time::Duration::from_millis(1000)).await;
-    println!("Deploying...");
+    println!("\nDeploying...");
     stdout().flush()?;
     API::new(&user.remote_url)?
         .deploy_plan(deploys, user.remote_token)
         .await?;
-    println!("Deployed!\n");
+    println!("Deployed!");
     stdout().flush()?;
     ok!(())
 }
