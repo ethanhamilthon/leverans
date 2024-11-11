@@ -82,13 +82,15 @@ impl API {
         &self,
         config: String,
         token: String,
-        filter: Option<Vec<String>>,
+        to_build: Option<Vec<String>>,
+        filter: Vec<String>,
     ) -> Result<Vec<Deploy>> {
         let mut upload_url = self.main_url.clone();
         upload_url.set_path("/plan");
         let body = json!({
             "config": config,
-            "filter": filter
+            "filter": filter,
+            "to_build": to_build
         })
         .to_string();
         let res = self
@@ -266,7 +268,7 @@ impl API {
 
 #[tokio::test]
 async fn health_test() {
-    let client = reqwest::client::builder()
+    let client = reqwest::Client::builder()
         .danger_accept_invalid_certs(true) // отключаем проверку сертификатов
         .build()
         .unwrap();

@@ -21,11 +21,11 @@ use super::plan_handle::handle_plan;
 pub async fn new_handle_deploy(
     file_name: String,
     context: String,
-    no_build: bool,
+    to_build: Option<Vec<String>>,
     filter: Option<String>,
     only: Option<Vec<String>>,
 ) -> Result<()> {
-    let (user, deploys) = handle_plan(filter, only, file_name, context.clone(), no_build).await?;
+    let (user, deploys) = handle_plan(filter, only, file_name, context.clone(), to_build).await?;
     let mut confirm = String::new();
     print!("These are all the tasks that will be deployed. Please confirm (y/n): ");
     stdout().flush()?;

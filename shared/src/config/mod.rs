@@ -22,7 +22,7 @@ pub struct MainConfig {
 #[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AppConfig {
-    pub build: String,
+    pub build: Option<String>,
     pub dockerfile: Option<String>,
     pub context: Option<String>,
     pub domain: Option<String>,
@@ -77,7 +77,26 @@ pub struct ServiceConfig {
 impl FromStr for MainConfig {
     type Err = Box<dyn Error>;
     fn from_str(s: &str) -> Result<MainConfig, Box<dyn Error>> {
-        let config: MainConfig = serde_yaml::from_str(s)?;
+        let mut config: MainConfig = serde_yaml::from_str(s)?;
+        config.app = config.app.map(|a| {
+            a.into_iter()
+                .map(|b| {
+                    let mut c = b.1.clone();
+                    c.build = if c.build.is_none() {
+                        Some("manual".to_string())
+                    } else {
+                        c.build.map(|s| {
+                            if &s == "auto" || &s == "manual" {
+                                s
+                            } else {
+                                "manual".to_string()
+                            }
+                        })
+                    };
+                    (b.0, c)
+                })
+                .collect::<HashMap<String, AppConfig>>()
+        });
         Ok(config)
     }
 }

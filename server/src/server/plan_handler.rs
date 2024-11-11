@@ -17,6 +17,7 @@ use super::{auth_handler::must_auth, ServerData};
 pub struct PlanBody {
     pub config: String,
     pub filter: Option<Vec<String>>,
+    pub to_build: Option<Vec<String>>,
 }
 
 pub async fn handle_plan(
@@ -25,6 +26,7 @@ pub async fn handle_plan(
     req: HttpRequest,
 ) -> Result<impl Responder> {
     must_auth(&req)?;
+    dbg!(&body);
     let secrets: Vec<_> = SecretData::list_db(&sd.repo.pool)
         .await
         .map_err(|_| {
@@ -50,12 +52,24 @@ pub async fn handle_plan(
         .into_iter()
         .map(|d| (d.project_name, d.deploys))
         .collect();
+    let images: Vec<_> = sd
+        .docker_service
+        .list_images()
+        .await
+        .map_err(|_| {
+            InternalError::new("Failed to get images", StatusCode::from_u16(500).unwrap())
+        })?
+        .into_iter()
+        .map(|i| i.tag)
+        .collect();
     let params = PlanParamaters {
         main_config: body.config.clone(),
         last_deploys: deploys,
         secrets,
         network_name: "lev".to_string(),
         filter: body.filter.clone(),
+        to_build: body.to_build.clone().unwrap_or(vec![]),
+        images,
     };
     let this_deploys = plan(params)
         .map_err(|e| InternalError::new(format!("{}", e), StatusCode::from_u16(400).unwrap()))?;

@@ -16,12 +16,12 @@ pub async fn handle_routes(cli: Lev) -> Result<()> {
     match cli.command {
         Commands::Local { build } => handle_local(build).await,
         Commands::Deploy {
-            file,
             context,
-            no_build,
+            build,
             filter,
             only,
-        } => new_handle_deploy(file, context, no_build, filter, only).await,
+            file,
+        } => new_handle_deploy(file, context, build, filter, only).await,
         Commands::Auth { address } => handle_auth(address, false).await,
         Commands::Login { address } => handle_auth(address, true).await,
         Commands::Logout => handle_logout().await,
@@ -37,11 +37,11 @@ pub async fn handle_routes(cli: Lev) -> Result<()> {
         Commands::Plan {
             file,
             context,
-            no_build,
+            build,
             single_filter,
             only,
         } => {
-            handle_plan(single_filter, only, file, context, no_build).await?;
+            handle_plan(single_filter, only, file, context, build).await?;
             ok!(())
         }
     }

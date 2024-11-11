@@ -3,7 +3,7 @@ use shared::ok;
 use std::{
     fs,
     io::{Read, Write},
-    thread::{sleep, sleep_ms},
+    thread::sleep,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 

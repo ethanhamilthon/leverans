@@ -17,7 +17,7 @@ pub async fn handle_plan(
     only: Option<Vec<String>>,
     file_name: String,
     context: String,
-    no_build: bool,
+    to_build: Option<Vec<String>>,
 ) -> Result<(RemoteAuth, Vec<Deploy>)> {
     //println!("Plan");
     //dbg!(&single_filter);
@@ -35,10 +35,26 @@ pub async fn handle_plan(
             .to_str()
             .ok_or(anyhow!("failed to convert path to string"))?,
     )?;
+    let final_filter = if single_filter.is_some() && only.is_some() {
+        let mut ffilter = only.clone().unwrap();
+        ffilter.push(single_filter.unwrap());
+        ffilter
+    } else if single_filter.is_none() && only.is_some() {
+        only.clone().unwrap()
+    } else if single_filter.is_some() && only.is_none() {
+        vec![single_filter.unwrap()]
+    } else {
+        vec![]
+    };
 
     // get plan
     let deploys = API::new(&user.remote_url)?
-        .get_plans(raw_config, user.remote_token.clone(), only)
+        .get_plans(
+            raw_config,
+            user.remote_token.clone(),
+            to_build,
+            final_filter,
+        )
         .await?;
 
     // print tasks

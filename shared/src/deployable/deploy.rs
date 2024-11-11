@@ -6,94 +6,6 @@ use super::{Buildable, Connectable, Deployable};
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 
-pub struct DeployParameters {
-    pub main_config: String,
-    pub last_config: Option<String>,
-    pub secrets: Vec<SecretValue>,
-    pub docker: DockerService,
-    pub is_local: bool,
-    pub network_name: String,
-    pub filter: Option<String>,
-}
-
-impl DeployParameters {
-    pub async fn deploy(&self) -> Result<String> {
-        let config =
-            MainConfig::from_str(&self.main_config).map_err(|_| anyhow!("invalid yaml"))?;
-        let buildables = config_to_buildables(config.clone())?;
-        let main_deployables = config_to_deployable(
-            config.clone(),
-            config_to_connectable(config)?,
-            self.secrets.clone(),
-            buildables,
-        )?;
-        let mut last_deployables = if self.last_config.is_some() {
-            serde_json::from_str::<Vec<Deployable>>(&self.last_config.clone().unwrap())?
-        } else {
-            vec![]
-        };
-        let deployables = if self.filter.is_some() {
-            let filter = self.filter.clone().unwrap();
-            main_deployables
-                .iter()
-                .filter(|d| d.short_name == filter)
-                .map(|d| d.clone())
-                .collect::<Vec<_>>()
-        } else {
-            Self::updated_deployables(main_deployables.clone(), last_deployables.clone())
-        };
-        let service_names: Vec<String> = self
-            .docker
-            .list_services()
-            .await?
-            .into_iter()
-            .map(|s| s.spec.unwrap().name.unwrap())
-            .collect();
-        for deployable in &deployables {
-            deployable
-                .deploy(
-                    self.docker.clone(),
-                    service_names.clone(),
-                    self.network_name.clone(),
-                    !self.is_local,
-                )
-                .await?;
-        }
-        if self.filter.is_some() {
-            if let Some(th_deployable) = last_deployables
-                .iter_mut()
-                .find(|d| d.short_name == self.filter.clone().unwrap())
-            {
-                if deployables.len() == 1 {
-                    *th_deployable = deployables[0].clone();
-                }
-            } else {
-                last_deployables.push(deployables[0].clone());
-            }
-
-            let res = serde_json::to_string(&last_deployables)?;
-            ok!(res)
-        } else {
-            Ok(serde_json::to_string(&main_deployables)?)
-        }
-    }
-
-    pub fn updated_deployables(main: Vec<Deployable>, last: Vec<Deployable>) -> Vec<Deployable> {
-        let mut deployables = vec![];
-        for maind in main {
-            println!();
-            println!("looking for {}", maind.short_name);
-            dbg!(&maind);
-            println!();
-            if !last.contains(&maind) {
-                println!("{} will be deployed", maind.short_name);
-                deployables.push(maind);
-            }
-        }
-        println!("{} to be deployed", deployables.len());
-        deployables
-    }
-}
 pub fn config_to_connectable(config: MainConfig) -> Result<Vec<Connectable>> {
     let mut connectables = vec![];
     if let Some(apps) = config.app {
@@ -132,6 +44,7 @@ pub fn config_to_deployable(
     connectables: Vec<Connectable>,
     secrets: Vec<SecretValue>,
     buildables: Vec<Buildable>,
+    images: Vec<String>,
 ) -> Result<Vec<Deployable>> {
     let mut deployables = vec![];
     if let Some(apps) = config.app {
@@ -143,6 +56,7 @@ pub fn config_to_deployable(
                 secrets.clone(),
                 connectables.to_vec(),
                 buildables.clone(),
+                images.clone(),
             )?);
         }
     }
@@ -173,10 +87,27 @@ pub fn config_to_deployable(
     ok!(deployables)
 }
 
-pub fn config_to_buildables(config: MainConfig) -> Result<Vec<Buildable>> {
+pub fn config_to_buildables(
+    config: MainConfig,
+    to_build: Option<Vec<String>>,
+    images: Vec<String>,
+) -> Result<Vec<Buildable>> {
     let mut buildables = vec![];
+    let to_build_flat = if to_build.is_some() {
+        to_build.unwrap()
+    } else {
+        vec![]
+    };
     if let Some(apps) = config.app {
         for (app_name, app) in apps {
+            if app.build.is_some()
+                && app.build.clone().unwrap() == "manual"
+                && !to_build_flat.contains(&app_name)
+                && exists_in_image_list(images.clone(), app_name.clone(), config.project.clone())
+            {
+                println!("there is no build task for {} ", app_name);
+                continue;
+            }
             buildables.push(Buildable::from_app_config(
                 app_name,
                 app,
@@ -185,6 +116,17 @@ pub fn config_to_buildables(config: MainConfig) -> Result<Vec<Buildable>> {
         }
     }
     ok!(buildables)
+}
+
+pub fn exists_in_image_list(images: Vec<String>, name: String, project_name: String) -> bool {
+    let image_prefix = format!("{}-{}-image", project_name, name);
+    for image in images {
+        if image.starts_with(&image_prefix) {
+            println!("{} exists in image list", image_prefix);
+            return true;
+        }
+    }
+    false
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -217,6 +159,8 @@ pub struct PlanParamaters {
     pub secrets: Vec<SecretValue>,
     pub network_name: String,
     pub filter: Option<Vec<String>>,
+    pub to_build: Vec<String>,
+    pub images: Vec<String>,
 }
 
 impl Deploy {
@@ -247,10 +191,12 @@ impl Deploy {
     }
 }
 
-pub fn plan(params: PlanParamaters) -> Result<Vec<Deploy>> {
+pub fn plan(mut params: PlanParamaters) -> Result<Vec<Deploy>> {
     let main_config = MainConfig::from_str(&params.main_config)
         .map_err(|_| anyhow!("cannot parse last config"))?;
-
+    if params.filter.is_some() && params.filter.clone().unwrap().len() == 0 {
+        params.filter = None;
+    }
     // last deployed configs
     let last_deploys = params
         .last_deploys
@@ -273,12 +219,19 @@ pub fn plan(params: PlanParamaters) -> Result<Vec<Deploy>> {
 
     // get all configuration // all logic is here
     let connectables = config_to_connectable(main_config.clone())?;
-    let buildables = config_to_buildables(main_config.clone())?;
+    let buildables = config_to_buildables(
+        main_config.clone(),
+        Some(params.to_build.clone()),
+        params.images.clone(),
+    )?;
+    dbg!(&params.to_build);
+    dbg!(&buildables);
     let deployables = config_to_deployable(
         main_config.clone(),
         connectables.clone(),
         params.secrets.clone(),
         buildables.clone(),
+        params.images.clone(),
     )?;
 
     // get this time deploys // without comparing with last one
@@ -356,6 +309,7 @@ pub fn plan(params: PlanParamaters) -> Result<Vec<Deploy>> {
                             && d.deployable.project_name == deploy.deployable.project_name
                     })
                     .is_some();
+                dbg!(&exists_in_last);
                 let is_changed = !last_deploy.contains(&deploy);
 
                 deploy.action = if exists_in_last && is_changed {
@@ -434,6 +388,8 @@ fn deploy_test() {
         secrets: secrets.clone(),
         network_name: "test".to_string(),
         filter: None,
+        to_build: vec![],
+        images: vec![],
     };
     let deploys = plan(params).unwrap();
     dbg!(&deploys);
@@ -466,6 +422,8 @@ fn deploy_test() {
         secrets: secrets.clone(),
         network_name: "test".to_string(),
         filter: None,
+        to_build: vec![],
+        images: vec![],
     };
     let deploys = plan(params).unwrap();
     dbg!(&deploys);
@@ -496,6 +454,8 @@ fn deploy_test() {
         secrets: secrets.clone(),
         network_name: "test".to_string(),
         filter: None,
+        to_build: vec![],
+        images: vec![],
     };
     let deploys = plan(params).unwrap();
     dbg!(&deploys);

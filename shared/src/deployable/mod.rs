@@ -1,6 +1,6 @@
 pub mod deploy;
 
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::HashMap, path::PathBuf, u128};
 
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
@@ -44,6 +44,38 @@ pub struct ProxyParams {
     pub domain: String,
 }
 
+pub fn get_last_image_tag(
+    images: Vec<String>,
+    project_name: String,
+    name: String,
+) -> Option<String> {
+    let image_name = format!("{}-{}-image", project_name, name);
+    let versions = images
+        .into_iter()
+        .filter(|i| {
+            if i.starts_with(&image_name) {
+                true
+            } else {
+                false
+            }
+        })
+        .map(|i| i.split(":").last().unwrap().to_string())
+        .collect::<Vec<String>>();
+    let mut sorted_versions = versions
+        .into_iter()
+        .map(|v| v.parse::<u128>())
+        .filter(|v| v.is_ok())
+        .map(|v| v.unwrap())
+        .collect::<Vec<u128>>();
+    sorted_versions.sort_by(|a, b| b.cmp(a));
+
+    if sorted_versions.len() > 0 {
+        Some(image_name + ":" + &sorted_versions[0].to_string())
+    } else {
+        None
+    }
+}
+
 impl Deployable {
     pub fn from_app_config(
         name: String,
@@ -52,12 +84,19 @@ impl Deployable {
         secrets: Vec<SecretValue>,
         connectables: Vec<Connectable>,
         buildables: Vec<Buildable>,
+        images: Vec<String>,
     ) -> Result<Self> {
         // find right image
-        let buildable = buildables
-            .into_iter()
-            .find(|b| b.short_name == name)
-            .ok_or(anyhow!("No buildable"))?;
+        dbg!(&buildables);
+        let this_build = buildables.into_iter().find(|b| b.short_name == name);
+        let last_image_name = get_last_image_tag(images, project_name.clone(), name.clone());
+        let image_name = if this_build.is_some() {
+            this_build.unwrap().tag.clone()
+        } else if last_image_name.is_some() {
+            last_image_name.unwrap()
+        } else {
+            err!(anyhow!("could not find image for {}", name))
+        };
         // routing
         let proxy = if config.port.is_some() && config.domain.is_some() {
             Some(ProxyParams {
@@ -74,7 +113,7 @@ impl Deployable {
             project_name: project_name.clone(),
             config_type: "app".to_string(),
             service_name: format!("{}-{}-service", project_name, name),
-            docker_image: buildable.tag,
+            docker_image: image_name,
             proxies: if proxy.is_some() {
                 vec![proxy.unwrap()]
             } else {

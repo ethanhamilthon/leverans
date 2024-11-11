@@ -9,7 +9,7 @@ use actix_web::{
 };
 use anyhow::anyhow;
 use auth_handler::{handle_is_super_user_exists, login_user, register_super_user};
-use deploy_handler::{handle_deploy, new_deploy_handle};
+use deploy_handler::handle_deploy;
 use docker_handler::{list_images, upload};
 use futures::FutureExt;
 use futures_util::future::{ready, Ready};
@@ -66,7 +66,6 @@ pub async fn start_server(server: ServerData) -> std::io::Result<()> {
             })
             .app_data(web::Data::new(server))
             .route("/upload_image", web::post().to(upload))
-            .route("/deploy", web::post().to(new_deploy_handle))
             .route("/new-deploy", web::post().to(handle_deploy))
             .route("/plan", web::get().to(handle_plan))
             .route("/list_images", web::get().to(list_images))

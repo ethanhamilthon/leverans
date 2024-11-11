@@ -19,8 +19,8 @@ pub enum Commands {
         #[arg(short = 'c', long, default_value = "./")]
         context: String,
 
-        #[arg(short = 'n', long, default_value_t = false)]
-        no_build: bool,
+        #[arg(short, long, default_value = None)]
+        build: Option<Vec<String>>,
 
         filter: Option<String>,
 
@@ -49,8 +49,8 @@ pub enum Commands {
         #[arg(short = 'c', long, default_value = "./")]
         context: String,
 
-        #[arg(short = 'n', long, default_value_t = false)]
-        no_build: bool,
+        #[arg(short, long, default_value = None)]
+        build: Option<Vec<String>>,
 
         single_filter: Option<String>,
 
