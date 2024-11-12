@@ -46,9 +46,27 @@ pub async fn new_handle_deploy(
     sleep(std::time::Duration::from_millis(1000)).await;
     println!("\nDeploying...");
     stdout().flush()?;
-    API::new(&user.remote_url)?
-        .deploy_plan(deploys, user.remote_token)
-        .await?;
+    let api = API::new(&user.remote_url)?;
+    let mut failed = false;
+    let mut err_message = String::new();
+    for _ in 0..3 {
+        match api
+            .deploy_plan(deploys.clone(), user.remote_token.clone())
+            .await
+        {
+            Ok(_) => {
+                failed = false;
+                break;
+            }
+            Err(e) => {
+                failed = true;
+                err_message = e.to_string();
+            }
+        }
+    }
+    if failed {
+        err!(anyhow!("Failed to deploy: {}", err_message));
+    }
     println!("Deployed!");
     stdout().flush()?;
     ok!(())

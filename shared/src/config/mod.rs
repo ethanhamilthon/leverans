@@ -83,13 +83,13 @@ impl FromStr for MainConfig {
                 .map(|b| {
                     let mut c = b.1.clone();
                     c.build = if c.build.is_none() {
-                        Some("manual".to_string())
+                        Some("auto".to_string())
                     } else {
                         c.build.map(|s| {
                             if &s == "auto" || &s == "manual" {
                                 s
                             } else {
-                                "manual".to_string()
+                                "auto".to_string()
                             }
                         })
                     };

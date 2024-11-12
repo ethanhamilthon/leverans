@@ -1,0 +1,9 @@
+[package]
+name = "docs"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+actix-web = "4.9.0"
+askama = "0.12.1"
+pulldown-cmark = "0.12.2"
