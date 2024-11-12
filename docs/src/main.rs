@@ -10,7 +10,10 @@ async fn index() -> impl Responder {
         title: "<strong>Test</strong>".to_string(),
     };
 
-    Html::new(layout.render().unwrap())
+
+
+
+    Html::new(layout.render())
 }
 
 #[actix_web::main]
