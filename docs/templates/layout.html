@@ -1,12 +1,22 @@
-<!DOCTYPE >
-<html>
-  <head>
-    <title>Layout</title>
-  </head>
-  <style></style>
+<!DOCTYPE>
+<html class="dark">
 
-  <body>
-    <div id="app"></div>
-    <div>{{ title|safe }}</div>
-  </body>
+<head>
+  <title>{{ title }}</title>
+  <link href="/static/css/output.css" rel="stylesheet" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@100..900&display=swap" rel="stylesheet" />
+</head>
+
+<body class="w-full flex flex-col min-h-screen">
+  {% include "header.html" %}
+
+  <main class="flex w-full py-2 gap-6">
+    {% include "navbar.html" %} {% block content %} {% endblock %}
+  </main>
+</body>
+
+<script src="/static/js/main.js"></script>
+
 </html>

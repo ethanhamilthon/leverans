@@ -1,0 +1,42 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+h1 {
+  @apply text-4xl font-bold font-serif;
+}
+
+h2 {
+  @apply text-2xl font-medium;
+}
+
+body {
+  @apply bg-neutral-900 text-white;
+}
+
+.mp {
+  @apply text-zinc-300 text-sm font-light;
+}
+
+.mhe {
+  @apply w-full pb-1 pt-5 border-b border-b-zinc-700;
+}
+
+p {
+  font-family: "Geist Mono", monospace;
+  font-optical-sizing: auto;
+  font-weight: 400;
+  font-style: normal;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: "Geist Mono", monospace;
+  font-optical-sizing: auto;
+  font-weight: 700;
+  font-style: normal;
+}
