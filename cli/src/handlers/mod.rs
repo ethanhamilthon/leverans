@@ -1,6 +1,7 @@
 pub mod auth_handle;
 pub mod build_handle;
 pub mod deploy_handle;
+pub mod new_handler;
 pub mod plan_handle;
 pub mod secret_handle;
 

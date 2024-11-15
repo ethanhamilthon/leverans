@@ -57,6 +57,9 @@ pub enum Commands {
         #[arg(short, long, default_value = None)]
         only: Option<Vec<String>>,
     },
+    New {
+        name: Option<String>,
+    },
 }
 
 #[derive(Subcommand, Clone)]

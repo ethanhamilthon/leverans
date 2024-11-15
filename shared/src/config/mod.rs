@@ -32,33 +32,17 @@ pub struct AppConfig {
     pub args: Option<Vec<String>>,
     pub volumes: Option<HashMap<String, String>>,
     pub mounts: Option<HashMap<String, String>>,
+    pub proxy: Option<Vec<ConfigProxy>>,
 }
 
 #[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DbConfig {
     pub from: String,
-    pub username: Option<String>,
-    pub password: Option<String>,
-    pub dbname: Option<String>,
     pub envs: Option<HashMap<String, String>>,
     pub args: Option<Vec<String>>,
     pub volumes: Option<HashMap<String, String>>,
     pub mounts: Option<HashMap<String, String>>,
-}
-
-// Реализуем трейт Display вручную
-impl fmt::Display for DbConfig {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "db {}: {}, {}, {}.",
-            self.from.clone(),
-            self.username.clone().unwrap_or(format!("no data")),
-            self.password.clone().unwrap_or(format!("no data")),
-            self.dbname.clone().unwrap_or(format!("no data"))
-        )
-    }
 }
 
 #[skip_serializing_none]
@@ -72,6 +56,15 @@ pub struct ServiceConfig {
     pub args: Option<Vec<String>>,
     pub volumes: Option<HashMap<String, String>>,
     pub mounts: Option<HashMap<String, String>>,
+    pub proxy: Option<Vec<ConfigProxy>>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ConfigProxy {
+    pub domain: String,
+    pub port: u16,
+    pub path_prefix: Option<String>,
 }
 
 impl FromStr for MainConfig {

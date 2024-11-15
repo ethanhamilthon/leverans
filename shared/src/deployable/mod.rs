@@ -98,15 +98,24 @@ impl Deployable {
             err!(anyhow!("could not find image for {}", name))
         };
         // routing
-        let proxy = if config.port.is_some() && config.domain.is_some() {
-            Some(ProxyParams {
+        let mut proxy = if config.port.is_some() && config.domain.is_some() {
+            vec![ProxyParams {
                 port: config.port.unwrap(),
                 path_prefix: config.path_prefix.unwrap_or("/".to_string()),
                 domain: config.domain.unwrap(),
-            })
+            }]
         } else {
-            None
+            vec![]
         };
+        if let Some(proxies) = config.proxy {
+            for p in proxies {
+                proxy.push(ProxyParams {
+                    port: p.port,
+                    path_prefix: p.path_prefix.unwrap_or("/".to_string()),
+                    domain: p.domain,
+                });
+            }
+        }
 
         ok!(Self {
             short_name: name.clone(),
@@ -114,11 +123,7 @@ impl Deployable {
             config_type: "app".to_string(),
             service_name: format!("{}-{}-service", project_name, name),
             docker_image: image_name,
-            proxies: if proxy.is_some() {
-                vec![proxy.unwrap()]
-            } else {
-                vec![]
-            },
+            proxies: proxy,
             envs: final_envs(config.envs, connectables, secrets),
             volumes: config.volumes.unwrap_or(HashMap::new()),
             mounts: config.mounts.unwrap_or(HashMap::new()),
@@ -135,15 +140,24 @@ impl Deployable {
         secrets: Vec<SecretValue>,
         connectables: Vec<Connectable>,
     ) -> Result<Self> {
-        let proxy = if config.port.is_some() && config.domain.is_some() {
-            Some(ProxyParams {
+        let mut proxy = if config.port.is_some() && config.domain.is_some() {
+            vec![ProxyParams {
                 port: config.port.unwrap(),
                 path_prefix: config.path_prefix.unwrap_or("/".to_string()),
                 domain: config.domain.unwrap(),
-            })
+            }]
         } else {
-            None
+            vec![]
         };
+        if let Some(proxies) = config.proxy {
+            for p in proxies {
+                proxy.push(ProxyParams {
+                    port: p.port,
+                    path_prefix: p.path_prefix.unwrap_or("/".to_string()),
+                    domain: p.domain,
+                });
+            }
+        }
 
         ok!(Self {
             short_name: name.clone(),
@@ -151,11 +165,7 @@ impl Deployable {
             config_type: "service".to_string(),
             service_name: format!("{}-{}-service", project_name, name),
             docker_image: config.image,
-            proxies: if proxy.is_some() {
-                vec![proxy.unwrap()]
-            } else {
-                vec![]
-            },
+            proxies: proxy,
             envs: final_envs(config.envs, connectables, secrets),
             volumes: config.volumes.unwrap_or(HashMap::new()),
             mounts: config.mounts.unwrap_or(HashMap::new()),
@@ -456,6 +466,7 @@ impl Connectable {
                     dbname
                 ))
             }
+
             "mysql" => {
                 let default_envs =
                     get_default_envs("mysql").ok_or(anyhow!("No default envs for mysql"))?;
@@ -481,6 +492,7 @@ impl Connectable {
                 err!(anyhow!("Invalid database type, your type is {}", typ))
             }
         };
+
         let internal_link = None;
         ok!(Self {
             short_name: name.clone(),

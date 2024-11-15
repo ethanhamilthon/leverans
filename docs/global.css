@@ -15,11 +15,27 @@ body {
 }
 
 .mp {
-  @apply text-zinc-300 text-sm font-light;
+  @apply text-zinc-300 text-sm font-light leading-6;
+}
+
+.mli {
+  @apply text-zinc-100 text-sm font-light relative before:content-['>'] before:absolute before:left-0 before:mr-2 pl-4;
+}
+
+.ms {
+  @apply font-bold;
+}
+
+.mul {
+  @apply flex flex-col gap-1;
 }
 
 .mhe {
   @apply w-full pb-1 pt-5 border-b border-b-zinc-700;
+}
+
+.mem {
+  @apply p-1 py-[2px] bg-emerald-800/40 rounded-md;
 }
 
 p {

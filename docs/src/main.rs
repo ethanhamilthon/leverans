@@ -4,14 +4,23 @@ use actix_web::{
     App, HttpResponse, HttpServer, Responder, Result,
 };
 use askama::Template;
-use content::get_html_page;
+use content::{get_global_menu, get_html_page, MenuFolder};
 
 pub mod content;
-pub mod render;
+pub mod install;
+
+async fn install_script() -> Result<impl Responder> {
+    Ok(HttpResponse::Ok().content_type("text/plain").body(
+        r#"
+    #!/bin/bash
+    echo "Installing Lev Docs..."
+    "#,
+    ))
+}
 
 async fn index(req: actix_web::HttpRequest) -> Result<impl Responder> {
     let path = req.path().to_string();
-    let files = match get_html_page(&path) {
+    let page = match get_html_page(&path) {
         Ok(file) => file,
         Err(_) => {
             return Ok(HttpResponse::Found()
@@ -19,9 +28,11 @@ async fn index(req: actix_web::HttpRequest) -> Result<impl Responder> {
                 .finish())
         }
     };
+    let folders = get_global_menu().unwrap().lock().unwrap().to_vec();
     let index = IndexTemplate {
-        title: "Home".to_string(),
-        content: files,
+        title: format!("{} | Lev Docs", page.metadata.title.clone()),
+        content: page.html.clone(),
+        folders,
     };
     Ok(HttpResponse::Ok()
         .content_type("text/html")
@@ -33,6 +44,7 @@ async fn main() -> std::io::Result<()> {
     println!("Server starting in http://localhost:8082/");
     HttpServer::new(move || {
         App::new()
+            .route("/install.sh", web::get().to(install_script))
             .default_service(web::route().to(index))
             .service(fs::Files::new("/static", "./static").show_files_listing())
     })
@@ -46,6 +58,7 @@ async fn main() -> std::io::Result<()> {
 pub struct IndexTemplate {
     pub title: String,
     pub content: String,
+    pub folders: Vec<MenuFolder>,
 }
 
 #[derive(Template)]

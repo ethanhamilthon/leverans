@@ -7,13 +7,15 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@100..900&display=swap" rel="stylesheet" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
 </head>
 
 <body class="w-full flex flex-col min-h-screen">
   {% include "header.html" %}
 
   <main class="flex w-full py-2">
-    {% include "navbar.html" %} {% block content %} {% endblock %}
+    {% include "menu.html" %} {% block content %} {% endblock %}
   </main>
 </body>
 

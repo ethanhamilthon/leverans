@@ -23,12 +23,14 @@ pub struct PageElement {
     pub metadata: PageMetadata,
 }
 
+#[derive(Serialize, Clone, Deserialize)]
 pub struct MenuElement {
     pub title: String,
     pub path: String,
     pub order: i32,
 }
 
+#[derive(Serialize, Clone, Deserialize)]
 pub struct MenuFolder {
     pub folder_name: String,
     pub folder_title: String,
@@ -64,15 +66,20 @@ pub fn markdown_to_html(markdown: &str) -> String {
                 Tag::Heading { level, .. } => {
                     html_output.push_str(&format!("<{} class=\"m{} mhe\">", level, level))
                 }
-                Tag::Emphasis => html_output.push_str("<em class=\"mem\">"),
-                Tag::Strong => html_output.push_str("<strong>"),
+                Tag::Emphasis => html_output.push_str("<span class=\"mem\">"),
+                Tag::Strong => html_output.push_str("<strong class=\"ms\">"),
+                Tag::List(_) => html_output.push_str("<ul class=\"mul\">"), // Маркированный список
+                Tag::Item => html_output.push_str("<li class=\"mli\">"),
                 _ => {}
             },
+
             Event::End(tag) => match tag {
                 TagEnd::Paragraph => html_output.push_str("</p>"),
                 TagEnd::Heading(level) => html_output.push_str(&format!("</{}>", level)),
-                TagEnd::Emphasis => html_output.push_str("</em>"),
+                TagEnd::Emphasis => html_output.push_str("</span>"),
                 TagEnd::Strong => html_output.push_str("</strong>"),
+                TagEnd::List(_) => html_output.push_str("</ul>"), // Закрытие маркированного списка
+                TagEnd::Item => html_output.push_str("</li>"),
                 _ => {}
             },
             Event::Text(text) => html_output.push_str(&text),
@@ -121,6 +128,7 @@ pub fn get_menu(pages: Vec<PageElement>) -> Result<Vec<MenuFolder>> {
         elements: vec![],
         order: 3,
     });
+
     for page in pages {
         if let Some(folder) = menu
             .iter_mut()
@@ -128,7 +136,7 @@ pub fn get_menu(pages: Vec<PageElement>) -> Result<Vec<MenuFolder>> {
         {
             folder.elements.push(MenuElement {
                 title: page.metadata.title,
-                path: page.metadata.path,
+                path: format!("/{}/{}", folder.folder_name, page.metadata.path),
                 order: page.metadata.order,
             });
         }
@@ -147,6 +155,7 @@ static GLOBAL_MENU: OnceLock<Arc<Mutex<Vec<MenuFolder>>>> = OnceLock::new();
 pub fn get_root_path() -> Result<String> {
     let path = env::current_dir()?;
     let parsed_path = Path::new(&path);
+    println!("parsed path: {}", parsed_path.display());
     Ok(parsed_path
         .join("docs")
         .to_str()
@@ -180,10 +189,9 @@ pub fn get_global_menu() -> Result<Arc<Mutex<Vec<MenuFolder>>>> {
     Ok(menu.clone())
 }
 
-pub fn get_html_page(path: &str) -> Result<String> {
+pub fn get_html_page(path: &str) -> Result<PageElement> {
     let map = get_global_map()?;
     let map = map.lock().map_err(|_| anyhow!("failed to lock map"))?;
-    println!("{}", path);
     let page = map.get(path).ok_or(anyhow!("page not found"))?;
-    Ok(page.html.clone())
+    Ok(page.clone())
 }

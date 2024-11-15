@@ -7,6 +7,7 @@ use crate::{
         auth_handle::{handle_auth, handle_logout, whoami},
         deploy_handle::new_handle_deploy,
         handle_local,
+        new_handler::handle_new,
         plan_handle::handle_plan,
         secret_handle::{add_secrets, list_secrets},
     },
@@ -44,5 +45,6 @@ pub async fn handle_routes(cli: Lev) -> Result<()> {
             handle_plan(single_filter, only, file, context, build).await?;
             ok!(())
         }
+        Commands::New { name } => handle_new(name),
     }
 }
