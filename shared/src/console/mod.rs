@@ -1,87 +1,26 @@
-use std::{
-    io::{self, Write},
-    time::Duration,
-};
+use std::time::Duration;
 
-use futures_util::StreamExt;
-use tokio::time::sleep;
+use indicatif::{ProgressBar, ProgressStyle};
 
-use crate::{docker::DockerService, docker_platform::get_docker_platform};
+pub fn new_loader(loading_msg: String) -> ProgressBar {
+    let spinner = ProgressBar::new_spinner();
+    spinner.set_style(
+        ProgressStyle::default_spinner()
+            .template("{spinner:.green} {msg}")
+            .unwrap()
+            .tick_strings(&["⠋", "⠙", "⠸", "⠴", "⠦", "⠇", "✔"]),
+    );
+    spinner.enable_steady_tick(Duration::from_millis(100));
+    spinner.set_message(loading_msg);
 
-pub async fn build() {
-    let docker = DockerService::new().unwrap();
-    let mut lines_to_delete = 0;
-    println!("🔧 Building image...");
-    io::stdout().flush().unwrap();
-
-    //println!("🔧 Building image...");
-    //io::stdout().flush().unwrap();
-    let mut stream = docker
-        .build_image(
-            "Dockerfile",
-            "flowm:latest",
-            "/Users/ethanmotion/pro/flower",
-            Some(get_docker_platform().unwrap().as_str()),
-        )
-        .await
-        .unwrap();
-
-    while let Some(msg) = stream.next().await {
-        match msg {
-            Ok(msg) => {
-                if let Some(text) = msg.stream {
-                    print!("{}", &text);
-                    io::stdout().flush().unwrap();
-                    lines_to_delete += count_newlines(&text);
-                    if lines_to_delete == 10 {
-                        clear_lines(10);
-                        lines_to_delete = 0
-                    }
-                }
-            }
-            Err(_) => {
-                println!("😶‍🌫️ Building failed!, lines: {}", lines_to_delete);
-                break;
-            }
-        }
-    }
-
-    clear_lines(lines_to_delete);
-    println!("🚀 Building done!, lines: {}", lines_to_delete);
-    io::stdout().flush().unwrap();
+    spinner
 }
 
-pub async fn clear() {
-    println!("some string");
-    io::stdout().flush().unwrap();
-
-    sleep(Duration::from_millis(2000)).await;
-
-    delete_prev_line();
-    println!("Done!");
-    io::stdout().flush().unwrap();
-}
-fn count_newlines(s: &str) -> usize {
-    let count = s.chars().filter(|&c| c == '\n').count();
-    if count == 0 {
-        0
-    } else {
-        count
-    }
+#[test]
+fn test_loader() {
+    let l = new_loader("uploading...".into());
+    std::thread::sleep(Duration::from_millis(5000));
+    l.finish_with_message("done");
+    assert!(true);
 }
 
-pub fn clear_lines(n: usize) {
-    for _ in 0..n {
-        delete_prev_line();
-        io::stdout().flush().unwrap();
-    }
-}
-
-fn delete_prev_line() {
-    print!("\x1b[A\x1b[2K");
-}
-
-#[tokio::test]
-async fn clear_test() {
-    build().await;
-}

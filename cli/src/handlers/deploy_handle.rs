@@ -6,8 +6,10 @@ use std::{
 };
 
 use anyhow::{anyhow, Result};
+use scopeguard::defer;
 use shared::{
-    config::MainConfig, docker::DockerService, docker_platform::get_docker_platform, err, ok,
+    config::MainConfig, console::new_loader, docker::DockerService,
+    docker_platform::get_docker_platform, err, ok,
 };
 use tokio::time::sleep;
 
@@ -43,9 +45,10 @@ pub async fn new_handle_deploy(
     let built_app_names = new_build_images(deploys.clone(), abs_path, docker.clone()).await?;
     upload_images(docker, built_app_names, user.remote_token.clone()).await?;
 
-    sleep(std::time::Duration::from_millis(1000)).await;
-    println!("\nDeploying...");
-    stdout().flush()?;
+    let loader = new_loader("deploying".to_string());
+    defer! {
+        loader.finish()
+    }
     let api = API::new(&user.remote_url)?;
     let mut failed = false;
     let mut err_message = String::new();
@@ -67,7 +70,6 @@ pub async fn new_handle_deploy(
     if failed {
         err!(anyhow!("Failed to deploy: {}", err_message));
     }
-    println!("Deployed!");
-    stdout().flush()?;
+    loader.finish_with_message("deployed successfully");
     ok!(())
 }

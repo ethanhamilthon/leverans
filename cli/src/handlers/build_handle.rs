@@ -1,4 +1,5 @@
 use reqwest::{multipart, Body};
+use scopeguard::defer;
 use std::{
     io::{stdout, Write},
     path::{Path, PathBuf},
@@ -11,6 +12,7 @@ use anyhow::{anyhow, Result};
 use futures::{Stream, StreamExt};
 use shared::{
     config::MainConfig,
+    console::new_loader,
     deployable::deploy::{Deploy, DeployTask},
     docker::DockerService,
     err, ok,
@@ -50,7 +52,10 @@ pub async fn new_build_images(
         let rx = rx.clone();
         let docker = docker.clone();
         joined_tasks.push(tokio::spawn(async move {
-            print!("\nBuilding app: {}", task.short_name);
+            let loader = new_loader(format!("building {}", task.short_name));
+            defer! {
+                loader.finish()
+            }
             stdout().flush().unwrap();
             let mut logs = vec![];
             let mut stream: Pin<Box<dyn Stream<Item = Result<_, _>> + Send>> = docker
@@ -80,7 +85,7 @@ pub async fn new_build_images(
                     }
                 }
             }
-            println!("\nBuilding Done: {}", task.short_name);
+            loader.finish_with_message(format!("built: {}", task.short_name));
             stdout().flush().unwrap();
             ok!(task.short_name)
         }));
@@ -105,9 +110,10 @@ pub async fn upload_images(
     token: String,
 ) -> Result<()> {
     for task in images {
-        print!("\nUploading image: {}", task);
-        stdout().flush()?;
-
+        let loader = new_loader(format!("uploading {}", task));
+        defer! {
+            loader.finish()
+        }
         let stream = docker.clone().save_image(task.clone());
         let stream_body = Body::wrap_stream(stream);
 
@@ -123,8 +129,7 @@ pub async fn upload_images(
         API::new(&remote_url)?
             .upload_image(form, token.clone())
             .await?;
-        println!("\nUpload Done: {}", task);
-        stdout().flush()?;
+        loader.finish_with_message(format!("uploaded: {}", task));
     }
 
     ok!(())
