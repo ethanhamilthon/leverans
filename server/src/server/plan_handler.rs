@@ -43,7 +43,8 @@ pub async fn handle_plan(
         .collect();
     let deploys: Vec<_> = DeployData::get_last_deploys(&sd.repo.pool)
         .await
-        .map_err(|_| {
+        .map_err(|e| {
+            dbg!(e);
             InternalError::new(
                 "Failed to get last deploys",
                 StatusCode::from_u16(500).unwrap(),

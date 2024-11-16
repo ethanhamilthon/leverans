@@ -246,6 +246,57 @@ impl API {
         }
     }
 
+    pub async fn update_secret(&self, key: &str, value: &str, token: &str) -> Result<()> {
+        let mut super_user_url = self.main_url.clone();
+        super_user_url.set_path("/secret");
+        let res = self
+            .req_client
+            .put(super_user_url)
+            .body(
+                json!({
+                    "key": key,
+                    "value": value
+                })
+                .to_string(),
+            )
+            .header("Content-Type", "application/json")
+            .header("X-LEVERANS-PASS", "true")
+            .header("Authorization", token)
+            .send()
+            .await?;
+        if res.status().is_success() {
+            Ok(())
+        } else {
+            let error_text = res.text().await?;
+            Err(anyhow!("Failed to update secret: {}", error_text))
+        }
+    }
+
+    pub async fn delete_secret(&self, key: &str, token: &str) -> Result<()> {
+        let mut super_user_url = self.main_url.clone();
+        super_user_url.set_path("/secret");
+        let res = self
+            .req_client
+            .delete(super_user_url)
+            .body(
+                json!({
+                    "key": key,
+                })
+                .to_string(),
+            )
+            .header("Content-Type", "application/json")
+            .header("X-LEVERANS-PASS", "true")
+            .header("Authorization", token)
+            .send()
+            .await?;
+        if res.status().is_success() {
+            Ok(())
+        } else {
+            let error_text = res.text().await?;
+            Err(anyhow!("Failed to delete secret: {}", error_text))
+        }
+    }
+
     pub async fn list_secret(&self, token: &str) -> Result<Vec<Secret>> {
         let mut super_user_url = self.main_url.clone();
         super_user_url.set_path("/secret");

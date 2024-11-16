@@ -9,7 +9,7 @@ use crate::{
         handle_local,
         new_handler::handle_new,
         plan_handle::handle_plan,
-        secret_handle::{add_secrets, list_secrets},
+        secret_handle::{add_secrets, delete_secrets, list_secrets, update_secrets},
     },
 };
 
@@ -45,6 +45,10 @@ pub async fn handle_routes(cli: Lev) -> Result<()> {
         Commands::Secret { command } => match command {
             crate::commands::SecretCommands::Ls => list_secrets().await,
             crate::commands::SecretCommands::Add { key, value } => add_secrets(key, value).await,
+            crate::commands::SecretCommands::Update { key, value } => {
+                update_secrets(key, value).await
+            }
+            crate::commands::SecretCommands::Delete { key } => delete_secrets(key).await,
         },
         Commands::Plan {
             file,

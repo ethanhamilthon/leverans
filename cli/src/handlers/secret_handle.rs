@@ -37,3 +37,37 @@ pub async fn list_secrets() -> Result<()> {
 
     ok!(())
 }
+
+pub async fn update_secrets(key: Option<String>, value: Option<String>) -> Result<()> {
+    let secret_key = match key {
+        Some(key) => key,
+        None => err!(anyhow!("secret key is required")),
+    };
+    let secret_value = match value {
+        Some(value) => value,
+        None => err!(anyhow!("secret value is required")),
+    };
+
+    let user = UserData::load_db(false).await?.load_current_user().await?;
+    API::new(&user.remote_url)?
+        .update_secret(&secret_key, &secret_value, &user.remote_token)
+        .await?;
+
+    println!("✔︎ Secret updated successfully");
+    ok!(())
+}
+
+pub async fn delete_secrets(key: Option<String>) -> Result<()> {
+    let secret_key = match key {
+        Some(key) => key,
+        None => err!(anyhow!("secret key is required")),
+    };
+
+    let user = UserData::load_db(false).await?.load_current_user().await?;
+    API::new(&user.remote_url)?
+        .delete_secret(&secret_key, &user.remote_token)
+        .await?;
+
+    println!("✔︎ Secret deleted successfully");
+    ok!(())
+}

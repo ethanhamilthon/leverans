@@ -50,6 +50,23 @@ impl SecretData {
         let dt = DateTime::parse_from_rfc3339(&self.created_at)?;
         Ok(dt.with_timezone(&Utc))
     }
+
+    pub async fn delete_db(key: String, conn: &SqlitePool) -> Result<()> {
+        query("delete from secrets where key = ?")
+            .bind(key)
+            .execute(conn)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn update_db(key: String, value: String, conn: &SqlitePool) -> Result<()> {
+        query("update secrets set value = ? where key = ?")
+            .bind(value)
+            .bind(key)
+            .execute(conn)
+            .await?;
+        Ok(())
+    }
 }
 
 pub const SECRET_MIGRATION: &str = r#"

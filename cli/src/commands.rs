@@ -92,6 +92,16 @@ pub enum SecretCommands {
         #[arg(short = 'v', long, default_value = None)]
         value: Option<String>,
     },
+    Update {
+        #[arg(short = 'k', long, default_value = None)]
+        key: Option<String>,
+        #[arg(short = 'v', long, default_value = None)]
+        value: Option<String>,
+    },
+    Delete {
+        #[arg(short = 'k', long, default_value = None)]
+        key: Option<String>,
+    },
 }
 
 #[derive(Subcommand, Clone)]

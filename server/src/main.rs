@@ -3,6 +3,7 @@ use std::error::Error;
 use rand::{distributions::Alphanumeric, Rng};
 use server::{auth_handler::change_jwt_secret, start_server, ServerData};
 
+pub mod cron;
 pub mod repo;
 pub mod server;
 

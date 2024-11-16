@@ -41,6 +41,45 @@ pub async fn handle_add_secret(
     ok!(HttpResponse::Ok().body("OK"))
 }
 
+#[derive(Deserialize)]
+pub struct DeleteSecretBody {
+    key: String,
+}
+
+pub async fn handle_delete_secret(
+    sv: web::Data<Arc<ServerData>>,
+    body: web::Json<DeleteSecretBody>,
+    req: HttpRequest,
+) -> Result<impl Responder> {
+    must_auth(&req)?;
+    SecretData::delete_db(body.key.to_owned(), &sv.repo.pool)
+        .await
+        .map_err(|_| {
+            InternalError::new(
+                "Failed to delete secret",
+                StatusCode::from_u16(500).unwrap(),
+            )
+        })?;
+    ok!(HttpResponse::Ok().body("OK"))
+}
+
+pub async fn handle_update_secret(
+    sv: web::Data<Arc<ServerData>>,
+    body: web::Json<AddSecretBody>,
+    req: HttpRequest,
+) -> Result<impl Responder> {
+    must_auth(&req)?;
+    SecretData::update_db(body.key.to_owned(), body.value.to_owned(), &sv.repo.pool)
+        .await
+        .map_err(|_| {
+            InternalError::new(
+                "Failed to update secret",
+                StatusCode::from_u16(500).unwrap(),
+            )
+        })?;
+    ok!(HttpResponse::Ok().body("OK"))
+}
+
 pub async fn handle_list_secrets(
     sv: web::Data<Arc<ServerData>>,
     req: HttpRequest,

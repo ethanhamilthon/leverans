@@ -36,8 +36,9 @@ pub async fn new_build_images(
 ) -> Result<Vec<String>> {
     let build_tasks = deploys.iter().fold(vec![], |mut a, b| {
         b.client_tasks.iter().for_each(|task| {
-            let DeployTask::Build(b) = task;
-            a.push(b.clone());
+            if let DeployTask::Build(b) = task {
+                a.push(b.clone());
+            }
         });
         a
     });

@@ -15,7 +15,9 @@ use futures::FutureExt;
 use futures_util::future::{ready, Ready};
 use healthz_handler::handle_healthz;
 use plan_handler::handle_plan;
-use secret_handler::{handle_add_secret, handle_list_secrets};
+use secret_handler::{
+    handle_add_secret, handle_delete_secret, handle_list_secrets, handle_update_secret,
+};
 use shared::docker::DockerService;
 
 use crate::repo::Repo;
@@ -75,6 +77,8 @@ pub async fn start_server(server: ServerData) -> std::io::Result<()> {
             .route("/login/super", web::post().to(login_user))
             .route("/secret", web::post().to(handle_add_secret))
             .route("/secret", web::get().to(handle_list_secrets))
+            .route("/secret", web::delete().to(handle_delete_secret))
+            .route("/secret", web::put().to(handle_update_secret))
     })
     .bind(("0.0.0.0", port))?
     .run()

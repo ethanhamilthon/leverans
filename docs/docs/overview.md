@@ -40,7 +40,6 @@ Leverans delivers all the essentials of a modern PaaS:
 - Easy-to-use management interface
 - Automatic SSL certificates
 - Deploy any Docker-based application
-- Automated database backups
 - No vendor locks
 
 Additional functionality includes:

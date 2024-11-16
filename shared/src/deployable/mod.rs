@@ -1,4 +1,5 @@
 pub mod deploy;
+pub mod task;
 
 use std::{collections::HashMap, fmt::format, path::PathBuf, u128};
 
@@ -429,9 +430,8 @@ impl Connectable {
         let mut internal_link = None;
         if config.domain.is_some() && config.port.is_some() {
             internal_link = Some(format!(
-                "{}-{}-service:{}",
-                project_name,
-                name,
+                "{}:{}",
+                get_service_name(&name, &project_name),
                 config.port.unwrap()
             ));
         }
@@ -507,9 +507,8 @@ impl Connectable {
         let mut internal_link = None;
         if config.domain.is_some() && config.port.is_some() {
             internal_link = Some(format!(
-                "{}-{}-service:{}",
-                project_name,
-                name,
+                "{}:{}",
+                get_service_name(&name, &project_name),
                 config.port.unwrap()
             ));
         }
@@ -562,40 +561,40 @@ impl Buildable {
     }
 }
 
-pub struct Backupable {
-    pub volumes: Vec<String>,
-    pub service_name: String,
-    pub short_name: String,
-    pub project_name: String,
-    pub s3_access_key: String,
-    pub s3_secret_key: String,
-    pub s3_bucket: String,
-    pub s3_region: Option<String>,
-    pub s3_endpoint: String,
-    pub s3_file_name: String,
-    pub every: Option<u16>,
-}
-
-impl Backupable {
-    pub fn from_db_config(
-        name: String,
-        config: DbConfig,
-        project_name: String,
-        secrets: Vec<SecretValue>,
-        connectables: Vec<Connectable>,
-    ) -> Result<Self> {
-        ok!(Self {
-            volumes: todo!(),
-            service_name: todo!(),
-            short_name: todo!(),
-            project_name,
-            s3_access_key: todo!(),
-            s3_secret_key: todo!(),
-            s3_bucket: todo!(),
-            s3_region: todo!(),
-            s3_endpoint: todo!(),
-            s3_file_name: todo!(),
-            every: todo!(),
-        })
-    }
-}
+// pub struct Backupable {
+//     pub volumes: Vec<String>,
+//     pub service_name: String,
+//     pub short_name: String,
+//     pub project_name: String,
+//     pub s3_access_key: String,
+//     pub s3_secret_key: String,
+//     pub s3_bucket: String,
+//     pub s3_region: Option<String>,
+//     pub s3_endpoint: String,
+//     pub s3_file_name: String,
+//     pub every: Option<u16>,
+// }
+//
+// impl Backupable {
+//     pub fn from_db_config(
+//         name: String,
+//         config: DbConfig,
+//         project_name: String,
+//         secrets: Vec<SecretValue>,
+//         connectables: Vec<Connectable>,
+//     ) -> Result<Self> {
+//         ok!(Self {
+//             volumes: todo!(),
+//             service_name: todo!(),
+//             short_name: todo!(),
+//             project_name,
+//             s3_access_key: todo!(),
+//             s3_secret_key: todo!(),
+//             s3_bucket: todo!(),
+//             s3_region: todo!(),
+//             s3_endpoint: todo!(),
+//             s3_file_name: todo!(),
+//             every: todo!(),
+//         })
+//     }
+// }

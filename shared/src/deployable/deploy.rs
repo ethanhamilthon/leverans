@@ -91,6 +91,7 @@ pub fn config_to_buildables(
     config: MainConfig,
     to_build: Option<Vec<String>>,
     images: Vec<String>,
+    filters: Option<Vec<String>>,
 ) -> Result<Vec<Buildable>> {
     let mut buildables = vec![];
     let to_build_flat = if to_build.is_some() {
@@ -100,14 +101,33 @@ pub fn config_to_buildables(
     };
     if let Some(apps) = config.apps {
         for (app_name, app) in apps {
+            let image_exists =
+                exists_in_image_list(images.clone(), app_name.clone(), config.project.clone());
+            if filters.clone().is_some()
+                && !filters.clone().unwrap().contains(&app_name)
+                && image_exists
+            {
+                println!(
+                    "there is no build task for {}, because it is filtered ",
+                    app_name
+                );
+                continue;
+            }
             if app.build.is_some()
                 && app.build.clone().unwrap() == "manual"
                 && !to_build_flat.contains(&app_name)
-                && exists_in_image_list(images.clone(), app_name.clone(), config.project.clone())
+                && image_exists
             {
                 println!("there is no build task for {} ", app_name);
                 continue;
             }
+            dbg!(&app_name);
+            dbg!(filters.clone());
+            dbg!(exists_in_image_list(
+                images.clone(),
+                app_name.clone(),
+                config.project.clone()
+            ));
             buildables.push(Buildable::from_app_config(
                 app_name,
                 app,
@@ -144,6 +164,7 @@ pub struct Deploy {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum DeployTask {
     Build(Buildable),
+    HealthCheck,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -161,6 +182,7 @@ pub enum DeployAction {
     Nothing,
 }
 
+#[derive(Debug)]
 pub struct PlanParamaters {
     pub main_config: String,
     pub last_deploys: Vec<(String, String)>,
@@ -228,10 +250,12 @@ impl Deploy {
 
 pub fn plan(mut params: PlanParamaters) -> Result<Vec<Deploy>> {
     let main_config = MainConfig::from_str(&params.main_config)
-        .map_err(|_| anyhow!("cannot parse last config"))?;
+        .map_err(|e| anyhow!("cannot parse last config: {}", e.to_string()))?;
     if params.filter.is_some() && params.filter.clone().unwrap().len() == 0 {
         params.filter = None;
     }
+    dbg!(&params);
+    dbg!("main config: {}", &main_config);
     // last deployed configs
     let last_deploys = params
         .last_deploys
@@ -258,6 +282,7 @@ pub fn plan(mut params: PlanParamaters) -> Result<Vec<Deploy>> {
         main_config.clone(),
         Some(params.to_build.clone()),
         params.images.clone(),
+        params.filter.clone(),
     )?;
     dbg!(&params.to_build);
     dbg!(&buildables);
@@ -282,7 +307,7 @@ pub fn plan(mut params: PlanParamaters) -> Result<Vec<Deploy>> {
                     .ok_or(anyhow!("cannot find connectable"))?
                     .clone(),
                 before_tasks: vec![],
-                after_tasks: vec![],
+                after_tasks: vec![DeployTask::HealthCheck],
                 client_tasks: if let Some(b) = buildables
                     .iter()
                     .find(|b| b.short_name == d.short_name && b.project_name == d.project_name)

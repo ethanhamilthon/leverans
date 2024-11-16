@@ -63,8 +63,9 @@ pub async fn handle_plan(
     // build tasks
     let build_tasks = deploys.iter().fold(vec![], |mut a, b| {
         b.client_tasks.iter().for_each(|task| {
-            let DeployTask::Build(b) = task;
-            a.push(b.clone());
+            if let DeployTask::Build(b) = task {
+                a.push(b.clone());
+            };
         });
         a
     });

@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use bollard::Docker;
+pub mod custom;
 pub mod image;
 pub mod service;
 pub mod volume;
@@ -9,12 +10,14 @@ pub mod volume;
 #[derive(Debug, Clone)]
 pub struct DockerService {
     conn: Arc<Docker>,
+    custom_api: Arc<custom::CustomApi>,
 }
 
 impl DockerService {
     pub fn new() -> Result<Self> {
         //println!("Connecting docker");
         Ok(DockerService {
+            custom_api: Arc::new(custom::CustomApi::new("/var/run/docker.sock".to_string())),
             conn: Arc::new(Docker::connect_with_socket_defaults()?),
         })
     }
