@@ -26,6 +26,25 @@ pub async fn handle_deploy(
 ) -> Result<impl Responder> {
     must_auth(&req)?;
     let mut project_name: String = String::new();
+    let service_names: Vec<_> = sd
+        .docker_service
+        .list_services()
+        .await
+        .map_err(|_| {
+            InternalError::new(
+                "Failed to list services",
+                StatusCode::from_u16(500).unwrap(),
+            )
+        })?
+        .into_iter()
+        .filter_map(|s| {
+            if let Some(spec) = s.spec {
+                Some(spec.name.unwrap())
+            } else {
+                None
+            }
+        })
+        .collect();
     for deploy in body.iter() {
         if !project_name.is_empty() && project_name != deploy.deployable.project_name.clone() {
             err!(InternalError::new(
@@ -36,7 +55,7 @@ pub async fn handle_deploy(
         }
         project_name = deploy.deployable.project_name.clone();
         deploy
-            .deploy(sd.docker_service.clone())
+            .deploy(sd.docker_service.clone(), service_names.clone())
             .await
             .map_err(|e| {
                 InternalError::new(

@@ -26,18 +26,21 @@ pub async fn new_handle_deploy(
     to_build: Option<Vec<String>>,
     filter: Option<String>,
     only: Option<Vec<String>>,
+    skip_confirm: bool,
 ) -> Result<()> {
     let (user, deploys) = handle_plan(filter, only, file_name, context.clone(), to_build).await?;
-    let mut confirm = String::new();
-    print!("These are all the tasks that will be deployed. Please confirm (y/n): ");
-    stdout().flush()?;
-    stdin()
-        .read_line(&mut confirm)
-        .map_err(|e| anyhow!("Error on reading confirmation {}", e))?;
-    confirm = confirm.trim().to_string();
+    if !skip_confirm {
+        let mut confirm = String::new();
+        print!("These are all the tasks that will be deployed. Please confirm (y/n): ");
+        stdout().flush()?;
+        stdin()
+            .read_line(&mut confirm)
+            .map_err(|e| anyhow!("Error on reading confirmation {}", e))?;
+        confirm = confirm.trim().to_string();
 
-    if confirm != "y" {
-        err!(anyhow!("Aborted, no changes were made"));
+        if confirm != "y" {
+            err!(anyhow!("Aborted, no changes were made"));
+        }
     }
 
     let docker = DockerService::new()?;

@@ -22,9 +22,20 @@ pub async fn handle_routes(cli: Lev) -> Result<()> {
             filter,
             only,
             file,
-        } => new_handle_deploy(file, context, build, filter, only).await,
-        Commands::Auth { address } => handle_auth(address, false).await,
-        Commands::Login { address } => handle_auth(address, true).await,
+            skip_confirm,
+        } => new_handle_deploy(file, context, build, filter, only, skip_confirm).await,
+        Commands::Auth {
+            address,
+            password,
+            username,
+            skip_confirm,
+        } => handle_auth(address, username, password, false, skip_confirm).await,
+        Commands::Login {
+            address,
+            password,
+            username,
+            skip_confirm,
+        } => handle_auth(address, username, password, true, skip_confirm).await,
         Commands::Logout => handle_logout().await,
         Commands::Whoami => whoami().await,
         Commands::Version => {

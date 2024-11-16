@@ -266,18 +266,3 @@ impl API {
         }
     }
 }
-
-#[tokio::test]
-async fn health_test() {
-    let client = reqwest::Client::builder()
-        .danger_accept_invalid_certs(true) // отключаем проверку сертификатов
-        .build()
-        .unwrap();
-    let res = client
-        .get("https://localhost/healthz")
-        .header("X-LEVERANS-PASS", "true")
-        .send()
-        .await
-        .unwrap();
-    assert!(res.status().is_success());
-}

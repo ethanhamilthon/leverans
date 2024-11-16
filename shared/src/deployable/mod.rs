@@ -1,6 +1,6 @@
 pub mod deploy;
 
-use std::{collections::HashMap, path::PathBuf, u128};
+use std::{collections::HashMap, fmt::format, path::PathBuf, u128};
 
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
@@ -32,8 +32,8 @@ pub struct Deployable {
     pub volumes: HashMap<String, String>,
     pub mounts: HashMap<String, String>,
     pub args: Vec<String>,
+    pub cmd: Vec<String>,
 
-    pub depends_on: Option<Vec<String>>,
     pub replicas: u32,
 }
 
@@ -121,14 +121,14 @@ impl Deployable {
             short_name: name.clone(),
             project_name: project_name.clone(),
             config_type: "app".to_string(),
-            service_name: format!("{}-{}-service", project_name, name),
+            service_name: get_service_name(&name, &project_name),
             docker_image: image_name,
             proxies: proxy,
             envs: final_envs(config.envs, connectables, secrets),
             volumes: config.volumes.unwrap_or(HashMap::new()),
             mounts: config.mounts.unwrap_or(HashMap::new()),
             args: config.args.unwrap_or(vec![]),
-            depends_on: None,
+            cmd: vec![],
             replicas: 2,
         })
     }
@@ -163,14 +163,14 @@ impl Deployable {
             short_name: name.clone(),
             project_name: project_name.clone(),
             config_type: "service".to_string(),
-            service_name: format!("{}-{}-service", project_name, name),
+            service_name: get_service_name(&name, &project_name),
             docker_image: config.image,
             proxies: proxy,
             envs: final_envs(config.envs, connectables, secrets),
             volumes: config.volumes.unwrap_or(HashMap::new()),
             mounts: config.mounts.unwrap_or(HashMap::new()),
             args: config.args.unwrap_or(vec![]),
-            depends_on: None,
+            cmd: vec![],
             replicas: 1,
         })
     }
@@ -192,7 +192,7 @@ impl Deployable {
                 envs =
                     get_default_envs("postgres").ok_or(anyhow!("No default envs for postgres"))?;
                 volumes.insert(
-                    format!("{}-{}-volume", project_name, name),
+                    get_db_volume_name(&name, &project_name),
                     "/var/lib/postgresql/data".to_string(),
                 );
                 "postgres".to_string()
@@ -200,7 +200,7 @@ impl Deployable {
             "mysql" => {
                 envs = get_default_envs("mysql").ok_or(anyhow!("No default envs for mysql"))?;
                 volumes.insert(
-                    format!("{}-{}-volume", project_name, name),
+                    get_db_volume_name(&name, &project_name),
                     "/var/lib/mysql".to_string(),
                 );
                 "mysql".to_string()
@@ -218,14 +218,14 @@ impl Deployable {
             short_name: name.clone(),
             project_name: project_name.clone(),
             config_type: "db".to_string(),
-            service_name: format!("{}-{}-service", project_name, name),
+            service_name: get_service_name(&name, &project_name),
             docker_image: image_name,
             proxies: vec![],
             envs,
             volumes: volumes,
             mounts: config.mounts.unwrap_or(HashMap::new()),
             args: config.args.unwrap_or(vec![]),
-            depends_on: None,
+            cmd: vec![],
             replicas: 1
         })
     }
@@ -284,52 +284,52 @@ impl Deployable {
             return labels;
         }
         labels.insert("traefik.enable".into(), "true".into());
-        let first_proxy = &self
-            .proxies
-            .get(0)
-            .expect("We expected at least one proxy settings");
-        let domain = &first_proxy.domain;
-        let path_prefix = &first_proxy.path_prefix;
-        let host = &self.service_name;
-        let port = &first_proxy.port;
-        let mut host_params = format!("Host(`{}`)", domain.clone());
-        if path_prefix != "/" {
-            host_params.push_str(format!(" && PathPrefix(`{}`)", path_prefix.clone()).as_str());
-        }
-        labels.insert(
-            format!("traefik.http.routers.{}.rule", host.clone()),
-            host_params,
-        );
-        labels.insert(
-            format!("traefik.http.routers.{}.service", host.clone()),
-            host.clone(),
-        );
-        labels.insert(
-            format!(
-                "traefik.http.services.{}.loadbalancer.server.port",
-                host.clone()
-            ),
-            port.to_string(),
-        );
-        if is_https {
+        let mut proxy_counter = 0;
+        self.proxies.iter().for_each(|p| {
+            proxy_counter += 1;
+            let domain = &p.domain;
+            let path_prefix = &p.path_prefix;
+            let host = &format!("{}-{}", self.service_name, proxy_counter);
+            let port = &p.port;
+            let mut host_params = format!("Host(`{}`)", domain.clone());
+            if path_prefix != "/" {
+                host_params.push_str(format!(" && PathPrefix(`{}`)", path_prefix.clone()).as_str());
+            }
             labels.insert(
-                format!("traefik.http.routers.{}.tls", host.clone()),
-                "true".into(),
+                format!("traefik.http.routers.{}.rule", host.clone()),
+                host_params,
             );
             labels.insert(
-                format!("traefik.http.routers.{}.tls.certresolver", host.clone()),
-                "myresolver".into(),
+                format!("traefik.http.routers.{}.service", host.clone()),
+                host.clone(),
             );
             labels.insert(
-                format!("traefik.http.routers.{}.entrypoints", host.clone()),
-                "websecure".into(),
+                format!(
+                    "traefik.http.services.{}.loadbalancer.server.port",
+                    host.clone()
+                ),
+                port.to_string(),
             );
-        } else {
-            labels.insert(
-                format!("traefik.http.routers.{}.entrypoints", host.clone()),
-                "web".into(),
-            );
-        }
+            if is_https {
+                labels.insert(
+                    format!("traefik.http.routers.{}.tls", host.clone()),
+                    "true".into(),
+                );
+                labels.insert(
+                    format!("traefik.http.routers.{}.tls.certresolver", host.clone()),
+                    "myresolver".into(),
+                );
+                labels.insert(
+                    format!("traefik.http.routers.{}.entrypoints", host.clone()),
+                    "websecure".into(),
+                );
+            } else {
+                labels.insert(
+                    format!("traefik.http.routers.{}.entrypoints", host.clone()),
+                    "web".into(),
+                );
+            }
+        });
         labels
     }
 }
@@ -462,7 +462,7 @@ impl Connectable {
                     "postgres://{}:{}@{}:5432/{}",
                     username,
                     password,
-                    format!("{}-{}-service", project_name, name),
+                    get_service_name(&name, &project_name),
                     dbname
                 ))
             }
@@ -484,7 +484,7 @@ impl Connectable {
                     "mysql://{}:{}@{}:3306/{}",
                     username,
                     password,
-                    format!("{}-{}-service", project_name, name),
+                    get_service_name(&name, &project_name),
                     dbname
                 ))
             }
@@ -522,6 +522,14 @@ impl Connectable {
     }
 }
 
+pub fn get_service_name(name: &str, project_name: &str) -> String {
+    format!("{}-{}-service", project_name, name)
+}
+
+pub fn get_db_volume_name(name: &str, project_name: &str) -> String {
+    format!("{}-{}-volume", project_name, name)
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Buildable {
     pub short_name: String,
@@ -554,39 +562,40 @@ impl Buildable {
     }
 }
 
-#[test]
-fn dep_test() {
-    let dep1 = Deployable {
-        short_name: String::from("dep1"),
-        project_name: String::from("dep1"),
-        config_type: String::from("dep1"),
-        service_name: String::from("dep1"),
-        docker_image: String::from("dep1"),
-        proxies: vec![],
-        envs: HashMap::from([("ENV".to_string(), "VALUE1".to_string())]),
-        volumes: HashMap::new(),
-        mounts: HashMap::new(),
-        args: vec![],
-        depends_on: None,
-        replicas: 1,
-    };
+pub struct Backupable {
+    pub volumes: Vec<String>,
+    pub service_name: String,
+    pub short_name: String,
+    pub project_name: String,
+    pub s3_access_key: String,
+    pub s3_secret_key: String,
+    pub s3_bucket: String,
+    pub s3_region: Option<String>,
+    pub s3_endpoint: String,
+    pub s3_file_name: String,
+    pub every: Option<u16>,
+}
 
-    let dep_vec = vec![dep1.clone(), dep1.clone()];
-
-    let dep2 = Deployable {
-        short_name: String::from("dep1"),
-        project_name: String::from("dep1"),
-        config_type: String::from("dep1"),
-        service_name: String::from("dep1"),
-        docker_image: String::from("dep1"),
-        proxies: vec![],
-        envs: HashMap::from([("ENV".to_string(), "VALUE".to_string())]),
-        volumes: HashMap::new(),
-        mounts: HashMap::new(),
-        args: vec![],
-        depends_on: None,
-        replicas: 1,
-    };
-
-    assert!(!dep_vec.contains(&dep2));
+impl Backupable {
+    pub fn from_db_config(
+        name: String,
+        config: DbConfig,
+        project_name: String,
+        secrets: Vec<SecretValue>,
+        connectables: Vec<Connectable>,
+    ) -> Result<Self> {
+        ok!(Self {
+            volumes: todo!(),
+            service_name: todo!(),
+            short_name: todo!(),
+            project_name,
+            s3_access_key: todo!(),
+            s3_secret_key: todo!(),
+            s3_bucket: todo!(),
+            s3_region: todo!(),
+            s3_endpoint: todo!(),
+            s3_file_name: todo!(),
+            every: todo!(),
+        })
+    }
 }

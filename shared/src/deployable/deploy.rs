@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 pub fn config_to_connectable(config: MainConfig) -> Result<Vec<Connectable>> {
     let mut connectables = vec![];
-    if let Some(apps) = config.app {
+    if let Some(apps) = config.apps {
         for (app_name, app) in apps {
             connectables.push(Connectable::from_app_config(
                 app_name,
@@ -18,7 +18,7 @@ pub fn config_to_connectable(config: MainConfig) -> Result<Vec<Connectable>> {
         }
     }
 
-    if let Some(dbs) = config.db {
+    if let Some(dbs) = config.databases {
         for (db_name, db) in dbs {
             connectables.push(Connectable::from_db_config(
                 db_name,
@@ -28,7 +28,7 @@ pub fn config_to_connectable(config: MainConfig) -> Result<Vec<Connectable>> {
         }
     }
 
-    if let Some(services) = config.service {
+    if let Some(services) = config.services {
         for (service_name, service) in services {
             connectables.push(Connectable::from_service_config(
                 service_name,
@@ -47,7 +47,7 @@ pub fn config_to_deployable(
     images: Vec<String>,
 ) -> Result<Vec<Deployable>> {
     let mut deployables = vec![];
-    if let Some(apps) = config.app {
+    if let Some(apps) = config.apps {
         for (app_name, app) in apps {
             deployables.push(Deployable::from_app_config(
                 app_name,
@@ -61,7 +61,7 @@ pub fn config_to_deployable(
         }
     }
 
-    if let Some(dbs) = config.db {
+    if let Some(dbs) = config.databases {
         for (db_name, db) in dbs {
             deployables.push(Deployable::from_db_config(
                 db_name,
@@ -73,7 +73,7 @@ pub fn config_to_deployable(
         }
     }
 
-    if let Some(services) = config.service {
+    if let Some(services) = config.services {
         for (service_name, service) in services {
             deployables.push(Deployable::from_service_config(
                 service_name,
@@ -98,7 +98,7 @@ pub fn config_to_buildables(
     } else {
         vec![]
     };
-    if let Some(apps) = config.app {
+    if let Some(apps) = config.apps {
         for (app_name, app) in apps {
             if app.build.is_some()
                 && app.build.clone().unwrap() == "manual"
@@ -132,6 +132,7 @@ pub fn exists_in_image_list(images: Vec<String>, name: String, project_name: Str
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Deploy {
     pub deployable: Deployable,
+    pub lifecycle: DeployLifecycle,
     pub connectable: Connectable,
     pub before_tasks: Vec<DeployTask>,
     pub after_tasks: Vec<DeployTask>,
@@ -143,6 +144,13 @@ pub struct Deploy {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum DeployTask {
     Build(Buildable),
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum DeployLifecycle {
+    Always,
+    Once,
+    Cron(String),
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Hash, Eq)]
@@ -164,30 +172,57 @@ pub struct PlanParamaters {
 }
 
 impl Deploy {
-    pub async fn deploy(&self, docker: DockerService) -> Result<()> {
-        match self.action {
-            DeployAction::Update => {
-                let docker_params = self
-                    .deployable
-                    .to_docker_params(self.network_name.clone(), true)?;
-                docker.update_service(docker_params).await?;
-                ok!(())
-            }
-            DeployAction::Create => {
-                let docker_params = self
-                    .deployable
-                    .to_docker_params(self.network_name.clone(), true)?;
-                docker.create_service(docker_params).await?;
-                ok!(())
-            }
-            DeployAction::Delete => {
-                docker
-                    .delete_service(self.deployable.service_name.clone())
-                    .await?;
-                ok!(())
-            }
-            DeployAction::Nothing => ok!(()),
+    pub async fn deploy(&self, docker: DockerService, service_names: Vec<String>) -> Result<()> {
+        match self.lifecycle {
+            DeployLifecycle::Always => match self.action {
+                DeployAction::Update => {
+                    if service_names.contains(&self.deployable.service_name) {
+                        self.update(docker).await
+                    } else {
+                        self.create(docker).await
+                    }
+                }
+                DeployAction::Create => {
+                    if service_names.contains(&self.deployable.service_name) {
+                        self.update(docker).await
+                    } else {
+                        self.create(docker).await
+                    }
+                }
+                DeployAction::Delete => {
+                    if service_names.contains(&self.deployable.service_name) {
+                        self.delete(docker).await
+                    } else {
+                        ok!(())
+                    }
+                }
+                DeployAction::Nothing => ok!(()),
+            },
+            _ => ok!(()),
         }
+    }
+
+    pub async fn update(&self, docker: DockerService) -> Result<()> {
+        let docker_params = self
+            .deployable
+            .to_docker_params(self.network_name.clone(), true)?;
+        docker.update_service(docker_params).await?;
+        ok!(())
+    }
+
+    pub async fn delete(&self, docker: DockerService) -> Result<()> {
+        docker
+            .delete_service(self.deployable.service_name.clone())
+            .await?;
+        ok!(())
+    }
+
+    pub async fn create(&self, docker: DockerService) -> Result<()> {
+        let docker_params = self
+            .deployable
+            .to_docker_params(self.network_name.clone(), true)?;
+        docker.create_service(docker_params).await?;
+        ok!(())
     }
 }
 
@@ -240,6 +275,7 @@ pub fn plan(mut params: PlanParamaters) -> Result<Vec<Deploy>> {
         .map::<Result<Deploy>, _>(|d| {
             Ok(Deploy {
                 deployable: d.clone(),
+                lifecycle: DeployLifecycle::Always,
                 connectable: connectables
                     .iter()
                     .find(|c| c.short_name == d.short_name)
@@ -340,6 +376,7 @@ pub fn plan(mut params: PlanParamaters) -> Result<Vec<Deploy>> {
 
         for mut deploy in deploys_to_delete {
             deploy.action = DeployAction::Delete;
+            deploy.client_tasks = vec![];
             final_deploys.push(deploy);
         }
     }

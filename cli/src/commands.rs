@@ -26,15 +26,36 @@ pub enum Commands {
 
         #[arg(short, long, default_value = None)]
         only: Option<Vec<String>>,
+
+        #[arg(short = 's', long, default_value_t = false)]
+        skip_confirm: bool,
     },
     Version,
     Auth {
         #[arg(short = 'a', long, help = "the address of your server, eg 312.89.06.172 or mydomain.com", default_value = None)]
         address: Option<String>,
+
+        #[arg(short = 'u', long, help = "your username", default_value = None)]
+        username: Option<String>,
+
+        #[arg(short = 'p', long, help = "your password", default_value = None)]
+        password: Option<String>,
+
+        #[arg(short = 's', long, default_value_t = false)]
+        skip_confirm: bool,
     },
     Login {
         #[arg(short = 'a', long, help = "the address of your server, eg 312.89.06.172 or mydomain.com", default_value = None)]
         address: Option<String>,
+
+        #[arg(short = 'u', long, help = "your username", default_value = None)]
+        username: Option<String>,
+
+        #[arg(short = 'p', long, help = "your password", default_value = None)]
+        password: Option<String>,
+
+        #[arg(short = 's', long, default_value_t = false)]
+        skip_confirm: bool,
     },
     Logout,
     Whoami,

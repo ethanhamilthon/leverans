@@ -1,6 +1,12 @@
-use std::time::Duration;
+use anyhow::{anyhow, Result};
+use std::{
+    io::{stdin, stdout, Write},
+    time::Duration,
+};
 
 use indicatif::{ProgressBar, ProgressStyle};
+
+use crate::ok;
 
 pub fn new_loader(loading_msg: String) -> ProgressBar {
     let spinner = ProgressBar::new_spinner();
@@ -14,6 +20,16 @@ pub fn new_loader(loading_msg: String) -> ProgressBar {
     spinner.set_message(loading_msg);
 
     spinner
+}
+
+pub fn ask(question: &str) -> Result<String> {
+    print!("{}", question);
+    stdout().flush()?;
+    let mut answer = String::new();
+    stdin()
+        .read_line(&mut answer)
+        .map_err(|e| anyhow!("Error on reading username: {}", e))?;
+    ok!(answer.trim().to_string())
 }
 
 #[test]

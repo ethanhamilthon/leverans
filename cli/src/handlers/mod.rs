@@ -45,7 +45,7 @@ pub async fn create_traefik() -> Result<()> {
 }
 
 pub fn change_local_domain(cfg: &mut MainConfig) {
-    if let Some(app) = &mut cfg.app {
+    if let Some(app) = &mut cfg.apps {
         for (_, app_config) in app {
             if let Some(domain) = &mut app_config.domain {
                 *domain = domain_to_local(domain);
@@ -72,7 +72,7 @@ fn config_domain_to_local() {
     let mut cfg = MainConfig::from_str(cfg_content).unwrap();
     change_local_domain(&mut cfg);
     assert_eq!(
-        cfg.app.as_ref().unwrap().get("myapp").unwrap().domain,
+        cfg.apps.as_ref().unwrap().get("myapp").unwrap().domain,
         Some("myapp-example.localhost".to_string())
     );
 }

@@ -12,15 +12,17 @@ pub mod shared;
 
 #[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct MainConfig {
     pub project: String,
-    pub app: Option<HashMap<String, AppConfig>>,
-    pub db: Option<HashMap<String, DbConfig>>,
-    pub service: Option<HashMap<String, ServiceConfig>>,
+    pub apps: Option<HashMap<String, AppConfig>>,
+    pub databases: Option<HashMap<String, DbConfig>>,
+    pub services: Option<HashMap<String, ServiceConfig>>,
 }
 
 #[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct AppConfig {
     pub build: Option<String>,
     pub dockerfile: Option<String>,
@@ -30,6 +32,7 @@ pub struct AppConfig {
     pub path_prefix: Option<String>,
     pub envs: Option<HashMap<String, String>>,
     pub args: Option<Vec<String>>,
+    pub cmds: Option<Vec<String>>,
     pub volumes: Option<HashMap<String, String>>,
     pub mounts: Option<HashMap<String, String>>,
     pub proxy: Option<Vec<ConfigProxy>>,
@@ -37,16 +40,24 @@ pub struct AppConfig {
 
 #[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct DbConfig {
     pub from: String,
     pub envs: Option<HashMap<String, String>>,
     pub args: Option<Vec<String>>,
     pub volumes: Option<HashMap<String, String>>,
     pub mounts: Option<HashMap<String, String>>,
+    pub backup: Option<BackupParams>,
 }
 
 #[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
+pub struct BackupParams {}
+
+#[skip_serializing_none]
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct ServiceConfig {
     pub image: String,
     pub domain: Option<String>,
@@ -54,6 +65,7 @@ pub struct ServiceConfig {
     pub path_prefix: Option<String>,
     pub envs: Option<HashMap<String, String>>,
     pub args: Option<Vec<String>>,
+    pub cmds: Option<Vec<String>>,
     pub volumes: Option<HashMap<String, String>>,
     pub mounts: Option<HashMap<String, String>>,
     pub proxy: Option<Vec<ConfigProxy>>,
@@ -71,7 +83,7 @@ impl FromStr for MainConfig {
     type Err = Box<dyn Error>;
     fn from_str(s: &str) -> Result<MainConfig, Box<dyn Error>> {
         let mut config: MainConfig = serde_yaml::from_str(s)?;
-        config.app = config.app.map(|a| {
+        config.apps = config.apps.map(|a| {
             a.into_iter()
                 .map(|b| {
                     let mut c = b.1.clone();
@@ -124,7 +136,7 @@ fn yaml_test_2() {
 
     let cfg = MainConfig::from_str(yaml_text).expect("failed to parse");
     assert_eq!(cfg.project, "my-name");
-    let app = cfg.app.as_ref().expect("app must be parsed");
+    let app = cfg.apps.as_ref().expect("app must be parsed");
     let app_build = app.get("first-one").unwrap().clone().dockerfile.unwrap();
     let app_domain = app.get("second-one").unwrap().clone().domain.unwrap();
     assert_eq!(app_build, "Dockerfile");

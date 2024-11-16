@@ -3,13 +3,38 @@ use std::{
     sync::Arc,
 };
 
+use url::Url;
+
+fn parse_url(input: &str) -> Result<Url> {
+    // Если схема не указана, добавляем "http://"
+    let input_with_scheme = if input.starts_with("http://") || input.starts_with("https://") {
+        input.to_string()
+    } else {
+        format!("http://{}", input)
+    };
+
+    // Пробуем разобрать URL
+    Url::parse(&input_with_scheme).map_err(|e| e.into())
+}
+
 use anyhow::{anyhow, Result};
-use shared::{err, ok};
+use shared::{console::ask, err, ok};
 
 use crate::{api::API, data::UserData};
 
-pub async fn handle_auth(address: Option<String>, is_login: bool) -> Result<()> {
-    let url = address.ok_or(anyhow!("No address provided"))?;
+pub async fn handle_auth(
+    init_address: Option<String>,
+    init_username: Option<String>,
+    init_password: Option<String>,
+    is_login: bool,
+    skip_confirm: bool,
+) -> Result<()> {
+    let url = if init_address.is_some() {
+        parse_url(init_address.unwrap().as_str())?
+    } else {
+        let address = ask("Server Address: ")?;
+        parse_url(address.as_str())?
+    };
     let db = UserData::load_db(false).await?;
     if let Ok(user) = db.load_current_user().await {
         err!(anyhow!(
@@ -17,7 +42,9 @@ pub async fn handle_auth(address: Option<String>, is_login: bool) -> Result<()> 
             user.remote_url
         ))
     }
-    let api = Arc::new(API::new(&url).map_err(|e| anyhow!("⚠️  Error on parsing address: {}", e))?);
+    let api = Arc::new(
+        API::new(&url.to_string()).map_err(|e| anyhow!("⚠️  Error on parsing address: {}", e))?,
+    );
 
     if is_login {
         println!(
@@ -61,36 +88,27 @@ pub async fn handle_auth(address: Option<String>, is_login: bool) -> Result<()> 
     }
     stdout().flush().unwrap();
 
-    print!("Username: ");
-    stdout().flush()?;
-    let mut username = String::new();
-    stdin()
-        .read_line(&mut username)
-        .map_err(|e| anyhow!("Error on reading username: {}", e))?;
-    username = username.trim().to_string();
+    let username = if init_username.is_some() {
+        init_username.unwrap()
+    } else {
+        ask("Username: ")?
+    };
+    let password = if init_password.is_some() {
+        init_password.unwrap()
+    } else {
+        ask("Password: ")?
+    };
+    if !skip_confirm {
+        let confirm = ask(&format!(
+            "Address: {} | Username: {} | Password: {} | Confirm (y/n): ",
+            url,
+            username,
+            "*".repeat(password.len())
+        ))?;
 
-    let mut password = String::new();
-    print!("Password: ");
-    stdout().flush()?;
-    stdin()
-        .read_line(&mut password)
-        .map_err(|e| anyhow!("Error on reading password: {}", e))?;
-    password = password.trim().to_string();
-
-    let mut confirm = String::new();
-    print!(
-        "Username: {}, Password: {}. Please confirm (y/n): ",
-        username,
-        "*".repeat(password.len()).as_str()
-    );
-    stdout().flush()?;
-    stdin()
-        .read_line(&mut confirm)
-        .map_err(|e| anyhow!("Error on reading confirmation {}", e))?;
-    confirm = confirm.trim().to_string();
-
-    if confirm != "y" {
-        err!(anyhow!("💨 Aborted, no changes were made"));
+        if confirm != "y" {
+            err!(anyhow!("💨 Aborted, no changes were made"));
+        }
     }
     if is_login {
         let token = api
@@ -102,7 +120,7 @@ pub async fn handle_auth(address: Option<String>, is_login: bool) -> Result<()> 
             err!(anyhow!("Error on loginning user: Empty token"));
         }
 
-        db.save_user(token, url).await?;
+        db.save_user(token, url.to_string(), username).await?;
 
         println!("\n✔︎ User logged in uccessfully, you are in system.\n Use `lev new` or `lev init` in root of your project to get started.");
     } else {
@@ -115,7 +133,7 @@ pub async fn handle_auth(address: Option<String>, is_login: bool) -> Result<()> 
             err!(anyhow!("Error on registering super user: Empty token"));
         }
 
-        db.save_user(token, url).await?;
+        db.save_user(token, url.to_string(), username).await?;
 
         println!("\n✔︎ Super user created successfully, you are in system.\n Use `lev new` or `lev init` in root of your project to get started.");
     }
@@ -134,6 +152,9 @@ pub async fn handle_logout() -> Result<()> {
 pub async fn whoami() -> Result<()> {
     let db = UserData::load_db(false).await?;
     let user = db.load_current_user().await?;
-    println!("✔︎ Current user url: {}", user.remote_url);
+    println!(
+        "✔︎ Current user: IP: {}  |  Username: {}",
+        user.remote_url, user.username
+    );
     Ok(())
 }
