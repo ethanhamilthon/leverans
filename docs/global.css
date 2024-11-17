@@ -38,6 +38,18 @@ body {
   @apply p-1 py-[2px] bg-emerald-800/40 rounded-md;
 }
 
+.mlink {
+  @apply text-blue-400;
+}
+
+.mcbf {
+  @apply py-3 px-5 bg-zinc-800/60 rounded-md;
+}
+
+.mcbi {
+  @apply px-2 py-1 bg-zinc-800/60 rounded-md;
+}
+
 p {
   font-family: "Geist Mono", monospace;
   font-optical-sizing: auto;

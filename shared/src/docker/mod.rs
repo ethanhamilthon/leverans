@@ -15,9 +15,8 @@ pub struct DockerService {
 
 impl DockerService {
     pub fn new() -> Result<Self> {
-        //println!("Connecting docker");
         Ok(DockerService {
-            custom_api: Arc::new(custom::CustomApi::new("/var/run/docker.sock".to_string())),
+            custom_api: Arc::new(custom::CustomApi::new()),
             conn: Arc::new(Docker::connect_with_socket_defaults()?),
         })
     }

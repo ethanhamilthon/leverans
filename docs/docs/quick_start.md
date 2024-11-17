@@ -10,7 +10,7 @@ order: 1
 ## Make sure you have installed Leverans
 
 Before you start, you need to download Leverans to your server and locally.
-If you haven't installed it yet, go to our installation guide.
+If you haven't installed it yet, go to our [installation guide.](/start/install)
 
 ## Authentication
 
@@ -23,8 +23,8 @@ lev auth -a your-ip -u your-username -p your-password
 
 Meaning of arguments:
 
-- **-a** - server address, e.g. `312.90.87.112`
-- **-u** - create new username, e.g. `linustorvald`
-- **-p** - create new password (make it strong), e.g. `s2dIs9oP98`
+- **-a** - server address, e.g. _312.90.87.112_
+- **-u** - create new username, e.g. _linustorvald_
+- **-p** - create new password (make it strong), e.g. _s2dIs9oP98_
 
 Now you created a super user. To make sure that everything was successful use the command `lev whoami`.

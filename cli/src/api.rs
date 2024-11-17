@@ -67,7 +67,6 @@ impl API {
             .header("Content-Type", "application/json")
             .header("X-LEVERANS-PASS", "true")
             .header("Authorization", token)
-            .timeout(std::time::Duration::from_secs(5))
             .send()
             .await?;
 

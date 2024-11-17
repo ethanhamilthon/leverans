@@ -2,7 +2,7 @@ use std::{collections::HashMap, str::FromStr, sync::Arc};
 
 use crate::{config::MainConfig, docker::DockerService, err, ok, SecretValue};
 
-use super::{Buildable, Connectable, Deployable};
+use super::{task::run_deploy_task, Buildable, Connectable, Deployable};
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 
@@ -164,7 +164,14 @@ pub struct Deploy {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum DeployTask {
     Build(Buildable),
-    HealthCheck,
+    HealthCheck(HealthCheckable),
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct HealthCheckable {
+    pub service_name: String,
+    pub timeout_sec: u16,
+    pub wait_sec: u16,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -199,17 +206,25 @@ impl Deploy {
             DeployLifecycle::Always => match self.action {
                 DeployAction::Update => {
                     if service_names.contains(&self.deployable.service_name) {
-                        self.update(docker).await
+                        self.update(docker.clone()).await?;
                     } else {
-                        self.create(docker).await
+                        self.create(docker.clone()).await?;
                     }
+                    for task in self.after_tasks.clone() {
+                        run_deploy_task(task, docker.clone()).await?;
+                    }
+                    Ok(())
                 }
                 DeployAction::Create => {
                     if service_names.contains(&self.deployable.service_name) {
-                        self.update(docker).await
+                        self.update(docker.clone()).await?;
                     } else {
-                        self.create(docker).await
+                        self.create(docker.clone()).await?;
                     }
+                    for task in self.after_tasks.clone() {
+                        run_deploy_task(task, docker.clone()).await?;
+                    }
+                    Ok(())
                 }
                 DeployAction::Delete => {
                     if service_names.contains(&self.deployable.service_name) {
@@ -307,7 +322,11 @@ pub fn plan(mut params: PlanParamaters) -> Result<Vec<Deploy>> {
                     .ok_or(anyhow!("cannot find connectable"))?
                     .clone(),
                 before_tasks: vec![],
-                after_tasks: vec![DeployTask::HealthCheck],
+                after_tasks: vec![DeployTask::HealthCheck(HealthCheckable {
+                    service_name: d.service_name.clone(),
+                    timeout_sec: 30,
+                    wait_sec: 5,
+                })],
                 client_tasks: if let Some(b) = buildables
                     .iter()
                     .find(|b| b.short_name == d.short_name && b.project_name == d.project_name)
