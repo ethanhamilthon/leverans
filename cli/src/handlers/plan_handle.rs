@@ -1,4 +1,4 @@
-use std::{fs, path::Path};
+use std::{fs, os, path::Path, process::exit};
 
 use anyhow::{anyhow, Result};
 use shared::{
@@ -57,18 +57,47 @@ pub async fn handle_plan(
         )
         .await?;
 
-    // print tasks
-    println!("Tasks: ");
-
+    let mut all_task_count = 0;
     // build tasks
     let build_tasks = deploys.iter().fold(vec![], |mut a, b| {
         b.client_tasks.iter().for_each(|task| {
             if let DeployTask::Build(b) = task {
+                all_task_count += 1;
                 a.push(b.clone());
             };
         });
         a
     });
+    // create tasks
+    let create_tasks = deploys.iter().fold(vec![], |mut a, b| {
+        if let DeployAction::Create = b.action {
+            all_task_count += 1;
+            a.push(b.clone());
+        }
+        a
+    });
+    // update tasks
+    let update_tasks = deploys.iter().fold(vec![], |mut a, b| {
+        if let DeployAction::Update = b.action {
+            all_task_count += 1;
+            a.push(b.clone());
+        }
+        a
+    });
+    // delete tasks
+    let delete_tasks = deploys.iter().fold(vec![], |mut a, b| {
+        if let DeployAction::Delete = b.action {
+            all_task_count += 1;
+            a.push(b.clone());
+        }
+        a
+    });
+    if all_task_count == 0 {
+        println!("No tasks, nothing will be changed");
+        exit(0);
+    }
+    // print tasks
+    println!("Tasks: ");
     if !build_tasks.is_empty() {
         println!("  Build - {}:", build_tasks.len());
         for task in build_tasks {
@@ -76,13 +105,6 @@ pub async fn handle_plan(
         }
     }
 
-    // create tasks
-    let create_tasks = deploys.iter().fold(vec![], |mut a, b| {
-        if let DeployAction::Create = b.action {
-            a.push(b.clone());
-        }
-        a
-    });
     if !create_tasks.is_empty() {
         println!("  Create - {}:", create_tasks.len());
         for task in create_tasks {
@@ -90,13 +112,6 @@ pub async fn handle_plan(
         }
     }
 
-    // update tasks
-    let update_tasks = deploys.iter().fold(vec![], |mut a, b| {
-        if let DeployAction::Update = b.action {
-            a.push(b.clone());
-        }
-        a
-    });
     if !update_tasks.is_empty() {
         println!("  Update - {}:", update_tasks.len());
         for task in update_tasks {
@@ -104,13 +119,6 @@ pub async fn handle_plan(
         }
     }
 
-    // delete tasks
-    let delete_tasks = deploys.iter().fold(vec![], |mut a, b| {
-        if let DeployAction::Delete = b.action {
-            a.push(b.clone());
-        }
-        a
-    });
     if !delete_tasks.is_empty() {
         println!("  Delete - {}:", delete_tasks.len());
         for task in delete_tasks {

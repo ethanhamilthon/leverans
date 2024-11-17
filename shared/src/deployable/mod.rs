@@ -36,6 +36,10 @@ pub struct Deployable {
     pub cmd: Vec<String>,
 
     pub replicas: u32,
+    pub cpu: f64,
+    pub memory: u64,
+
+    pub https_enabled: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -130,7 +134,10 @@ impl Deployable {
             mounts: config.mounts.unwrap_or(HashMap::new()),
             args: config.args.unwrap_or(vec![]),
             cmd: vec![],
-            replicas: 2,
+            replicas: config.replicas.unwrap_or(2),
+            cpu: config.cpu.unwrap_or(1.0),
+            memory: config.memory.unwrap_or(1024) as u64,
+            https_enabled: config.https.unwrap_or(true),
         })
     }
 
@@ -172,7 +179,10 @@ impl Deployable {
             mounts: config.mounts.unwrap_or(HashMap::new()),
             args: config.args.unwrap_or(vec![]),
             cmd: vec![],
-            replicas: 1,
+            replicas: config.replicas.unwrap_or(1),
+            cpu: config.cpu.unwrap_or(1.0),
+            memory: config.memory.unwrap_or(1024) as u64,
+            https_enabled: config.https.unwrap_or(true),
         })
     }
 
@@ -227,7 +237,10 @@ impl Deployable {
             mounts: config.mounts.unwrap_or(HashMap::new()),
             args: config.args.unwrap_or(vec![]),
             cmd: vec![],
-            replicas: 1
+            replicas: config.replicas.unwrap_or(1),
+            cpu: config.cpu.unwrap_or(1.0),
+            memory: config.memory.unwrap_or(1024) as u64,
+            https_enabled: false
         })
     }
 
@@ -272,14 +285,17 @@ impl Deployable {
             envs: self.envs.clone(),
             mounts: service_mounts,
             args: self.args.clone(),
-            cpu: 1.0,
-            memory: 1024,
+            cpu: self.cpu.try_into()?,
+            memory: self.memory.try_into()?,
             replicas: self.replicas.try_into()?,
             constraints: vec![],
         })
     }
 
-    pub fn get_labels(&self, is_https: bool) -> HashMap<String, String> {
+    pub fn get_labels(&self, mut is_https: bool) -> HashMap<String, String> {
+        if !is_https {
+            is_https = self.https_enabled;
+        }
         let mut labels = HashMap::new();
         if self.proxies.is_empty() {
             return labels;

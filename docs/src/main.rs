@@ -19,6 +19,7 @@ async fn install_script() -> Result<impl Responder> {
 }
 
 async fn index(req: actix_web::HttpRequest) -> Result<impl Responder> {
+    let now = std::time::Instant::now();
     let path = req.path().to_string();
     let page = match get_html_page(&path) {
         Ok(file) => file,
@@ -34,6 +35,7 @@ async fn index(req: actix_web::HttpRequest) -> Result<impl Responder> {
         content: page.html.clone(),
         folders,
     };
+    println!("rendering index in {}ms", now.elapsed().as_millis());
     Ok(HttpResponse::Ok()
         .content_type("text/html")
         .body(index.render().unwrap()))

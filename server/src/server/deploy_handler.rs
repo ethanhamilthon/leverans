@@ -46,6 +46,7 @@ pub async fn handle_deploy(
         })
         .collect();
     for deploy in body.iter() {
+        println!("deploying {}", deploy.deployable.short_name);
         if !project_name.is_empty() && project_name != deploy.deployable.project_name.clone() {
             err!(InternalError::new(
                 "All deploys must be from the same project",
@@ -58,6 +59,7 @@ pub async fn handle_deploy(
             .deploy(sd.docker_service.clone(), service_names.clone())
             .await
             .map_err(|e| {
+                dbg!(&e);
                 InternalError::new(
                     format!("Failed to deploy: {:?}", e),
                     StatusCode::from_u16(500).unwrap(),

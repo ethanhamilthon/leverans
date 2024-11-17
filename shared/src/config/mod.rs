@@ -35,7 +35,11 @@ pub struct AppConfig {
     pub cmds: Option<Vec<String>>,
     pub volumes: Option<HashMap<String, String>>,
     pub mounts: Option<HashMap<String, String>>,
+    pub replicas: Option<u32>,
+    pub cpu: Option<f64>,
+    pub memory: Option<u32>,
     pub proxy: Option<Vec<ConfigProxy>>,
+    pub https: Option<bool>,
 }
 
 #[skip_serializing_none]
@@ -47,13 +51,10 @@ pub struct DbConfig {
     pub args: Option<Vec<String>>,
     pub volumes: Option<HashMap<String, String>>,
     pub mounts: Option<HashMap<String, String>>,
-    pub backup: Option<BackupParams>,
+    pub replicas: Option<u32>,
+    pub cpu: Option<f64>,
+    pub memory: Option<u32>,
 }
-
-#[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(deny_unknown_fields)]
-pub struct BackupParams {}
 
 #[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -68,7 +69,11 @@ pub struct ServiceConfig {
     pub cmds: Option<Vec<String>>,
     pub volumes: Option<HashMap<String, String>>,
     pub mounts: Option<HashMap<String, String>>,
+    pub replicas: Option<u32>,
+    pub cpu: Option<f64>,
+    pub memory: Option<u32>,
     pub proxy: Option<Vec<ConfigProxy>>,
+    pub https: Option<bool>,
 }
 
 #[skip_serializing_none]

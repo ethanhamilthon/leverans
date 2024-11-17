@@ -40,7 +40,7 @@ pub struct MenuFolder {
 
 pub fn collect_file_contents_in_dir<P: AsRef<Path>>(dir: P) -> Vec<String> {
     let mut file_contents = Vec::new();
-
+    println!("opening files");
     for entry in WalkDir::new(dir) {
         if let Ok(entry) = entry {
             if entry.file_type().is_file() {
@@ -155,7 +155,6 @@ static GLOBAL_MENU: OnceLock<Arc<Mutex<Vec<MenuFolder>>>> = OnceLock::new();
 pub fn get_root_path() -> Result<String> {
     let path = env::current_dir()?;
     let parsed_path = Path::new(&path);
-    println!("parsed path: {}", parsed_path.display());
     Ok(parsed_path
         .join("docs")
         .to_str()
