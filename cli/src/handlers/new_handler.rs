@@ -13,10 +13,10 @@ pub fn handle_new(name: Option<String>) -> Result<()> {
                 curdir.to_string()
             } else {
                 println!("No folder name found");
-                "root".to_string()
+                "my-project".to_string()
             };
         }
-        "root".to_string()
+        "my-project".to_string()
     };
     let config = get_initial_config(project_name);
     let mut file = File::create("deploy.yaml")?;
@@ -29,8 +29,9 @@ fn get_initial_config(project_name: String) -> String {
         r#"
 project: {}
 
-app:
+apps:
   main:
+    build: manual
     domain: example.com
     port: 3000
     "#,
