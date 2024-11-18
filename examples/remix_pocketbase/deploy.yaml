@@ -1,0 +1,20 @@
+project: remixpro
+
+apps:
+  front:
+    build: manual
+    https: false
+    domain: remix.localhost
+    port: 3000
+    envs:
+      PB_URL: "{{ this.pocketbase.internal }}"
+    replicas: 1
+
+services:
+  pocketbase:
+    image: ghcr.io/muchobien/pocketbase:latest
+    volumes:
+      pbdata: /pb_data
+    domain: pb.localhost
+    port: 8090
+    https: false

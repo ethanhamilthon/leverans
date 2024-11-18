@@ -293,7 +293,7 @@ impl Deployable {
     }
 
     pub fn get_labels(&self, mut is_https: bool) -> HashMap<String, String> {
-        if !is_https {
+        if !self.https_enabled {
             is_https = self.https_enabled;
         }
         let mut labels = HashMap::new();

@@ -2,6 +2,7 @@ use anyhow::{anyhow, Result};
 use pulldown_cmark::{Event, Parser, Tag, TagEnd};
 use serde::{Deserialize, Serialize};
 use std::{
+    borrow::Cow,
     collections::HashMap,
     env, fs,
     path::Path,
@@ -63,12 +64,21 @@ pub fn markdown_to_html(markdown: &str, default: bool) -> String {
         pulldown_cmark::html::push_html(&mut html_output, parser);
         html_output
     } else {
+        let mut in_code_block = false;
         for event in parser {
             match event {
                 Event::Start(tag) => match tag {
                     Tag::Paragraph => html_output.push_str("<p class=\"mp\">"),
-                    Tag::Heading { level, .. } => {
-                        html_output.push_str(&format!("<{} class=\"m{} mhe\">", level, level))
+                    Tag::Heading {
+                        level, id, classes, ..
+                    } => {
+                        html_output.push_str(&format!(
+                            "<{} id=\"{}\" class=\"m{} mhe {}\">",
+                            level,
+                            id.map(|id| id.to_string()).unwrap_or("".to_string()),
+                            level,
+                            classes.join(" "),
+                        ));
                     }
                     Tag::Emphasis => html_output.push_str("<span class=\"mem\">"),
                     Tag::Strong => html_output.push_str("<strong class=\"ms\">"),
@@ -76,11 +86,16 @@ pub fn markdown_to_html(markdown: &str, default: bool) -> String {
                     Tag::Item => html_output.push_str("<li class=\"mli\">"),
                     Tag::CodeBlock(info) => match info {
                         pulldown_cmark::CodeBlockKind::Indented => {
-                            html_output.push_str(&format!("<span class=\"mcb mcbi\">"))
+                            in_code_block = true;
+                            html_output.push_str("<pre><code class=\"mcbi\">");
                         }
-                        pulldown_cmark::CodeBlockKind::Fenced(cow_str) => html_output.push_str(
-                            &format!("<span class=\"mcb mcbf\" data-lang=\"{}\">", cow_str),
-                        ),
+                        pulldown_cmark::CodeBlockKind::Fenced(cow_str) => {
+                            in_code_block = true;
+                            html_output.push_str(&format!(
+                                "<pre class=\"mcbf\" data-lang=\"{}\"><code >",
+                                cow_str
+                            ));
+                        }
                     },
                     Tag::Link {
                         dest_url, title, ..
@@ -100,11 +115,20 @@ pub fn markdown_to_html(markdown: &str, default: bool) -> String {
                     TagEnd::Strong => html_output.push_str("</strong>"),
                     TagEnd::List(_) => html_output.push_str("</ul>"), // Закрытие маркированного списка
                     TagEnd::Item => html_output.push_str("</li>"),
-                    TagEnd::CodeBlock => html_output.push_str("</span>"),
+                    TagEnd::CodeBlock => {
+                        in_code_block = false;
+                        html_output.push_str("</code></pre>");
+                    }
                     TagEnd::Link => html_output.push_str("</a>"),
                     _ => {}
                 },
-                Event::Text(text) => html_output.push_str(&text),
+                Event::Text(text) => {
+                    if in_code_block {
+                        html_output.push_str(&text.replace('\n', "<br>"));
+                    } else {
+                        html_output.push_str(&text)
+                    }
+                }
                 Event::Code(text) => html_output
                     .push_str(format!("<span class=\"mcb mcbi\">{}</span>", text).as_str()),
                 Event::Html(text) => html_output.push_str(&text),
