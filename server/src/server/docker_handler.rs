@@ -1,11 +1,10 @@
 use std::sync::Arc;
 
 use actix_multipart::Multipart;
-use actix_web::{error::InternalError, web, HttpRequest, HttpResponse, Responder, Result};
-use anyhow::anyhow;
+use actix_web::{web, HttpRequest, HttpResponse, Responder, Result};
 use futures::{channel::mpsc, SinkExt, StreamExt};
 
-use crate::server::auth_handler::must_auth;
+use crate::{repo::user_repo::RoleType, server::auth_handler::must_auth};
 
 use super::ServerData;
 
@@ -15,7 +14,14 @@ pub async fn upload(
     req: HttpRequest,
 ) -> Result<impl Responder> {
     println!("upload");
-    must_auth(&req)?;
+    must_auth(
+        &req,
+        vec![
+            RoleType::FullAccess,
+            RoleType::SuperUser,
+            RoleType::UpdateOnly,
+        ],
+    )?;
     let (mut tx, rx) = mpsc::channel(10);
 
     let handle = tokio::task::spawn_local(async move {
@@ -66,18 +72,4 @@ pub async fn upload(
             Ok(HttpResponse::InternalServerError().body(format!("Failed to load image: {:?}", e)))
         }
     }
-}
-
-pub async fn list_images(
-    sv: web::Data<Arc<ServerData>>,
-    req: HttpRequest,
-) -> Result<impl Responder> {
-    must_auth(&req)?;
-    let images = sv.docker_service.list_images().await.map_err(|_| {
-        InternalError::new(
-            anyhow!("error to list images"),
-            actix_web::http::StatusCode::INTERNAL_SERVER_ERROR,
-        )
-    })?;
-    Ok(web::Json(images))
 }

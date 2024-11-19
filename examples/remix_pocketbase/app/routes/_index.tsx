@@ -44,7 +44,9 @@ export default function Index() {
   return (
     <div className="flex justify-center w-full min-h-screen items-center">
       <div className="p-4 bg-neutral-800 rounded-md flex flex-col gap-4">
-        <h1>Remix + PocketBase + Leverans project</h1>
+        <h1 className="text-3xl">
+          Remix + PocketBase + Leverans example project
+        </h1>
         <div className="flex flex-col w-96 gap-4">
           {todos.map((todo) => (
             <div

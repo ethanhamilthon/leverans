@@ -5,9 +5,7 @@ use std::{
 };
 
 use actix_web::{
-    error::{self, InternalError},
-    http::StatusCode,
-    web, HttpRequest, HttpResponse, Responder, Result,
+    error::InternalError, http::StatusCode, web, HttpRequest, HttpResponse, Responder, Result,
 };
 use anyhow::{anyhow, Result as AnyResult};
 use bcrypt::verify;
@@ -15,7 +13,7 @@ use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation}
 use serde::{Deserialize, Serialize};
 use shared::{ok, UserAuthBody};
 
-use crate::repo::user_repo::User;
+use crate::repo::user_repo::{RoleType, User};
 
 use super::ServerData;
 
@@ -25,7 +23,8 @@ pub async fn handle_is_super_user_exists(
 ) -> Result<impl Responder> {
     must_have_levpass(&req)?;
     let pool = sd.repo.pool.borrow();
-    match User::super_user_exists(pool).await.map_err(|_| {
+    match User::super_user_exists(pool).await.map_err(|e| {
+        dbg!(e);
         InternalError::new(
             "Failed to check if super user exists",
             StatusCode::from_u16(500).unwrap(),
@@ -59,10 +58,87 @@ pub async fn login_user(
         );
     }
     ok!(
-        HttpResponse::Ok().body(create_jwt(body.username.borrow()).map_err(|_| {
+        HttpResponse::Ok().body(create_jwt(body.username.borrow(), user.role).map_err(|_| {
             InternalError::new("Failed to login user", StatusCode::from_u16(500).unwrap())
         })?)
     )
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct CreateUserBody {
+    username: String,
+    password: String,
+    role: String,
+}
+
+impl CreateUserBody {
+    pub fn get_role(&self) -> RoleType {
+        match self.role.as_str() {
+            "1" => RoleType::FullAccess,
+            "2" => RoleType::UpdateOnly,
+            "3" => RoleType::ReadOnly,
+            _ => RoleType::ReadOnly,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct UserSafe {
+    username: String,
+    role: String,
+}
+
+pub async fn user_list(sd: web::Data<Arc<ServerData>>, req: HttpRequest) -> Result<impl Responder> {
+    must_auth(&req, vec![RoleType::SuperUser])?;
+    let pool = sd.repo.pool.borrow();
+    let user_list: Vec<UserSafe> = User::get_all(pool)
+        .await
+        .map_err(|_| {
+            InternalError::new(
+                "Failed to get user list",
+                StatusCode::from_u16(500).unwrap(),
+            )
+        })?
+        .into_iter()
+        .map(|u| UserSafe {
+            username: u.username,
+            role: u.role.to_string(),
+        })
+        .collect();
+    ok!(web::Json(user_list))
+}
+
+pub async fn create_new_user(
+    sd: web::Data<Arc<ServerData>>,
+    body: web::Json<CreateUserBody>,
+    req: HttpRequest,
+) -> Result<impl Responder> {
+    must_auth(&req, vec![RoleType::SuperUser])?;
+    let pool = sd.repo.pool.borrow();
+    User::new(
+        body.username.clone(),
+        body.password.clone(),
+        body.get_role().to_string().as_str(),
+    )
+    .map_err(|_| {
+        InternalError::new(
+            "Failed to create super user",
+            StatusCode::from_u16(500).unwrap(),
+        )
+    })?
+    .insert_db(pool)
+    .await
+    .map_err(|_| {
+        InternalError::new(
+            "Failed to create super user",
+            StatusCode::from_u16(500).unwrap(),
+        )
+    })?;
+    ok!(HttpResponse::Ok().body(format!(
+        "User {} created with right {}",
+        body.username,
+        body.get_role().to_string()
+    )))
 }
 
 pub async fn register_super_user(
@@ -72,35 +148,40 @@ pub async fn register_super_user(
 ) -> Result<impl Responder> {
     must_have_levpass(&req)?;
     let pool = sd.repo.pool.borrow();
-    User::new(body.username.clone(), body.password.clone(), true)
-        .map_err(|_| {
+    User::new(
+        body.username.clone(),
+        body.password.clone(),
+        RoleType::SuperUser.to_string().as_str(),
+    )
+    .map_err(|_| {
+        InternalError::new(
+            "Failed to create super user",
+            StatusCode::from_u16(500).unwrap(),
+        )
+    })?
+    .insert_db(pool)
+    .await
+    .map_err(|_| {
+        InternalError::new(
+            "Failed to create super user",
+            StatusCode::from_u16(500).unwrap(),
+        )
+    })?;
+    ok!(HttpResponse::Ok().body(
+        create_jwt(body.username.borrow(), RoleType::SuperUser).map_err(|_| {
             InternalError::new(
                 "Failed to create super user",
                 StatusCode::from_u16(500).unwrap(),
             )
         })?
-        .insert_db(pool)
-        .await
-        .map_err(|_| {
-            InternalError::new(
-                "Failed to create super user",
-                StatusCode::from_u16(500).unwrap(),
-            )
-        })?;
-    ok!(
-        HttpResponse::Ok().body(create_jwt(body.username.borrow()).map_err(|_| {
-            InternalError::new(
-                "Failed to create super user",
-                StatusCode::from_u16(500).unwrap(),
-            )
-        })?)
-    )
+    ))
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct Claims {
     sub: String,
     exp: usize,
+    role: String,
 }
 
 pub static JWT_KEY: LazyLock<Mutex<String>> =
@@ -110,10 +191,11 @@ pub fn change_jwt_secret(secret_key: &str) {
     *JWT_KEY.lock().unwrap() = secret_key.to_string();
 }
 
-pub fn create_jwt(username: &str) -> AnyResult<String> {
+pub fn create_jwt(username: &str, role: RoleType) -> AnyResult<String> {
     let claims = Claims {
         sub: username.to_string(),
         exp: (SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() + 60 * 60 * 1000) as usize,
+        role: role.to_string(),
     };
 
     let header = Header::default();
@@ -156,17 +238,32 @@ pub fn must_have_levpass(req: &HttpRequest) -> Result<()> {
     }
 }
 
-pub fn must_auth(req: &HttpRequest) -> Result<String> {
+pub fn must_auth(req: &HttpRequest, should_be: Vec<RoleType>) -> Result<String> {
     match check_auth(req).map_err(|e| {
         println!("error: {:?}", e);
         InternalError::new("Unauthorized", StatusCode::from_u16(401).unwrap())
     }) {
-        Ok(e) => Ok(e),
+        Ok(e) => {
+            if should_be.is_empty() {
+                return Ok(e.sub);
+            }
+            if !should_be.contains(&RoleType::from_string(&e.role)) {
+                return Err(InternalError::new(
+                    format!(
+                        "Forbidden: role should be: {} ",
+                        should_be.get(0).unwrap().to_string()
+                    ),
+                    StatusCode::from_u16(403).unwrap(),
+                )
+                .into());
+            }
+            Ok(e.sub)
+        }
         Err(e) => Err(e.into()),
     }
 }
 
-pub fn check_auth(req: &HttpRequest) -> AnyResult<String> {
+pub fn check_auth(req: &HttpRequest) -> AnyResult<Claims> {
     check_header(req)?;
     let token = req
         .headers()
@@ -175,5 +272,5 @@ pub fn check_auth(req: &HttpRequest) -> AnyResult<String> {
         .to_str()?;
     println!("token: {}", token);
     let claims = verify_jwt(token)?;
-    ok!(claims.sub)
+    ok!(claims)
 }

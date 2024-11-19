@@ -1,18 +1,10 @@
 use std::{sync::Arc, time::Instant};
 
-use actix_web::{
-    body::MessageBody,
-    dev::{Service, ServiceRequest, ServiceResponse},
-    error::{self, ErrorUnauthorized},
-    middleware::{from_fn, Next},
-    web, App, Error, HttpResponse, HttpServer,
-};
-use anyhow::anyhow;
-use auth_handler::{handle_is_super_user_exists, login_user, register_super_user};
+use actix_web::{dev::Service, web, App, HttpServer};
+use auth_handler::{create_new_user, handle_is_super_user_exists, login_user, register_super_user};
 use deploy_handler::handle_deploy;
-use docker_handler::{list_images, upload};
+use docker_handler::upload;
 use futures::FutureExt;
-use futures_util::future::{ready, Ready};
 use healthz_handler::handle_healthz;
 use plan_handler::handle_plan;
 use secret_handler::{
@@ -70,7 +62,6 @@ pub async fn start_server(server: ServerData) -> std::io::Result<()> {
             .route("/upload_image", web::post().to(upload))
             .route("/new-deploy", web::post().to(handle_deploy))
             .route("/plan", web::get().to(handle_plan))
-            .route("/list_images", web::get().to(list_images))
             .route("/healthz", web::get().to(handle_healthz))
             .route("/auth/super", web::get().to(handle_is_super_user_exists))
             .route("/register/super", web::post().to(register_super_user))
@@ -79,6 +70,7 @@ pub async fn start_server(server: ServerData) -> std::io::Result<()> {
             .route("/secret", web::get().to(handle_list_secrets))
             .route("/secret", web::delete().to(handle_delete_secret))
             .route("/secret", web::put().to(handle_update_secret))
+            .route("/users", web::post().to(create_new_user))
     })
     .bind(("0.0.0.0", port))?
     .run()

@@ -1,14 +1,14 @@
-use std::{str::FromStr, sync::Arc};
+use std::sync::Arc;
 
 use actix_web::{
     error::InternalError, http::StatusCode, web, HttpRequest, HttpResponse, Responder, Result,
 };
 use serde::Deserialize;
-use shared::{config::MainConfig, deployable::deploy::Deploy, err, ok, SecretValue};
+use shared::{deployable::deploy::Deploy, err};
 
 use crate::{
-    repo::{config_repo::ConfigData, deploy_repo::DeployData, secret_repo::SecretData},
-    server::auth_handler::{check_auth, must_auth},
+    repo::{deploy_repo::DeployData, user_repo::RoleType},
+    server::auth_handler::must_auth,
 };
 
 use super::ServerData;
@@ -24,7 +24,7 @@ pub async fn handle_deploy(
     body: web::Json<Vec<Deploy>>,
     req: HttpRequest,
 ) -> Result<impl Responder> {
-    must_auth(&req)?;
+    must_auth(&req, vec![RoleType::FullAccess, RoleType::SuperUser])?;
     let mut project_name: String = String::new();
     let service_names: Vec<_> = sd
         .docker_service

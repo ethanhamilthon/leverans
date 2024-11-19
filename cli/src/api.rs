@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use reqwest::{multipart::Form, StatusCode};
 use serde_json::{self, json};
 
@@ -17,7 +19,6 @@ impl API {
             main_url: Url::parse(url)?,
             req_client: reqwest::Client::builder()
                 .danger_accept_invalid_certs(true) // Отключаем проверку сертификатов
-                .timeout(std::time::Duration::from_secs(60))
                 .build()
                 .unwrap(),
         })
@@ -60,13 +61,17 @@ impl API {
 
         let body = serde_json::to_string(&deploys)?;
         //println!("{}", body);
-        let res = self
-            .req_client
+        let client = reqwest::Client::builder()
+            .danger_accept_invalid_certs(true) // Отключаем проверку сертификатов
+            .build()
+            .unwrap();
+        let res = client
             .post(upload_url)
             .body(body)
             .header("Content-Type", "application/json")
             .header("X-LEVERANS-PASS", "true")
             .header("Authorization", token)
+            .timeout(Duration::from_secs(5))
             .send()
             .await?;
 
@@ -209,6 +214,39 @@ impl API {
             )
             .header("Content-Type", "application/json")
             .header("X-LEVERANS-PASS", "true")
+            .send()
+            .await?;
+        if res.status().is_success() {
+            Ok(res.text().await?)
+        } else {
+            let error_text = res.text().await?;
+            Err(anyhow!("Failed to login super user: {}", error_text))
+        }
+    }
+
+    pub async fn create_new_user(
+        &self,
+        username: &str,
+        password: &str,
+        role: &str,
+        token: &str,
+    ) -> Result<String> {
+        let mut super_user_url = self.main_url.clone();
+        super_user_url.set_path("/users");
+        let res = self
+            .req_client
+            .post(super_user_url)
+            .body(
+                json!({
+                    "username": username,
+                    "password": password,
+                    "role": role
+                })
+                .to_string(),
+            )
+            .header("Content-Type", "application/json")
+            .header("X-LEVERANS-PASS", "true")
+            .header("Authorization", token)
             .send()
             .await?;
         if res.status().is_success() {

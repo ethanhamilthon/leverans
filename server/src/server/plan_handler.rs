@@ -9,7 +9,7 @@ use shared::{
     ok, SecretValue,
 };
 
-use crate::repo::{deploy_repo::DeployData, secret_repo::SecretData};
+use crate::repo::{deploy_repo::DeployData, secret_repo::SecretData, user_repo::RoleType};
 
 use super::{auth_handler::must_auth, ServerData};
 
@@ -25,7 +25,15 @@ pub async fn handle_plan(
     body: web::Json<PlanBody>,
     req: HttpRequest,
 ) -> Result<impl Responder> {
-    must_auth(&req)?;
+    must_auth(
+        &req,
+        vec![
+            RoleType::FullAccess,
+            RoleType::SuperUser,
+            RoleType::UpdateOnly,
+            RoleType::ReadOnly,
+        ],
+    )?;
     dbg!(&body);
     let secrets: Vec<_> = SecretData::list_db(&sd.repo.pool)
         .await

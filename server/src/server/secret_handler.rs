@@ -6,7 +6,10 @@ use actix_web::{
 use serde::Deserialize;
 use shared::ok;
 
-use crate::{repo::secret_repo::SecretData, server::auth_handler::must_auth};
+use crate::{
+    repo::{secret_repo::SecretData, user_repo::RoleType},
+    server::auth_handler::must_auth,
+};
 
 use super::ServerData;
 
@@ -15,7 +18,7 @@ pub async fn handle_add_secret(
     body: web::Json<AddSecretBody>,
     req: HttpRequest,
 ) -> Result<impl Responder> {
-    must_auth(&req)?;
+    must_auth(&req, vec![RoleType::FullAccess, RoleType::SuperUser])?;
     let secret_list = SecretData::list_db(&sv.repo.pool).await.map_err(|_| {
         InternalError::new(
             "Failed to get secret list",
@@ -51,7 +54,7 @@ pub async fn handle_delete_secret(
     body: web::Json<DeleteSecretBody>,
     req: HttpRequest,
 ) -> Result<impl Responder> {
-    must_auth(&req)?;
+    must_auth(&req, vec![RoleType::SuperUser, RoleType::FullAccess])?;
     SecretData::delete_db(body.key.to_owned(), &sv.repo.pool)
         .await
         .map_err(|_| {
@@ -68,7 +71,7 @@ pub async fn handle_update_secret(
     body: web::Json<AddSecretBody>,
     req: HttpRequest,
 ) -> Result<impl Responder> {
-    must_auth(&req)?;
+    must_auth(&req, vec![RoleType::SuperUser, RoleType::FullAccess])?;
     SecretData::update_db(body.key.to_owned(), body.value.to_owned(), &sv.repo.pool)
         .await
         .map_err(|_| {
@@ -84,7 +87,15 @@ pub async fn handle_list_secrets(
     sv: web::Data<Arc<ServerData>>,
     req: HttpRequest,
 ) -> Result<impl Responder> {
-    must_auth(&req)?;
+    must_auth(
+        &req,
+        vec![
+            RoleType::SuperUser,
+            RoleType::FullAccess,
+            RoleType::ReadOnly,
+            RoleType::UpdateOnly,
+        ],
+    )?;
     let secret_list: Vec<HashMap<String, String>> = SecretData::list_db(&sv.repo.pool)
         .await
         .map_err(|_| {

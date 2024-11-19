@@ -2,9 +2,9 @@ use anyhow::Result;
 use shared::ok;
 
 use crate::{
-    commands::{Commands, Lev},
+    commands::{Commands, Lev, UserCommands},
     handlers::{
-        auth_handle::{handle_auth, handle_logout, whoami},
+        auth_handle::{create_user, handle_auth, handle_logout, whoami},
         deploy_handle::new_handle_deploy,
         handle_local,
         new_handler::handle_new,
@@ -61,5 +61,14 @@ pub async fn handle_routes(cli: Lev) -> Result<()> {
             ok!(())
         }
         Commands::New { name } => handle_new(name),
+        Commands::User { com } => match com {
+            UserCommands::List => todo!(),
+            UserCommands::Create {
+                username,
+                password,
+                role,
+                skip_confirm,
+            } => create_user(username, password, role, skip_confirm).await,
+        },
     }
 }

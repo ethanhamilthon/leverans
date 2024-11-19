@@ -10,6 +10,8 @@ COPY Cargo.toml Cargo.lock ./
 # Копируем Cargo.toml для каждого пакета в воркспейсе
 COPY server/Cargo.toml server/Cargo.toml
 RUN mkdir server/src && echo "fn main() {}" > server/src/main.rs
+COPY docs/Cargo.toml docs/Cargo.toml
+RUN mkdir docs/src && echo "fn main() {}" > docs/src/main.rs
 COPY cli/Cargo.toml cli/Cargo.toml
 RUN mkdir cli/src && echo "fn main() {}" > cli/src/main.rs
 COPY shared/Cargo.toml shared/Cargo.toml

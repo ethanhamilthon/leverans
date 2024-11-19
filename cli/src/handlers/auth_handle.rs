@@ -158,3 +158,50 @@ pub async fn whoami() -> Result<()> {
     );
     Ok(())
 }
+
+const ROLES: [&str; 3] = ["full_access", "update_only", "read_only"];
+
+pub async fn create_user(
+    init_username: Option<String>,
+    init_password: Option<String>,
+    role_id: Option<String>,
+    skip_confirm: bool,
+) -> Result<()> {
+    let user = UserData::load_db(false).await?.load_current_user().await?;
+    let username = if init_username.is_some() {
+        init_username.unwrap()
+    } else {
+        ask("Username: ")?
+    };
+    let password = if init_password.is_some() {
+        init_password.unwrap()
+    } else {
+        ask("Password: ")?
+    };
+    let role = if role_id.is_some() {
+        role_id.unwrap()
+    } else {
+        for (i, role) in ROLES.iter().enumerate() {
+            println!("{}: {}", i + 1, role);
+        }
+        ask("Enter role (1/2/3): ")?
+    };
+    let role_text = ROLES[role.as_str().parse::<usize>()? - 1];
+    if !skip_confirm {
+        let confirm = ask(&format!(
+            "Role: {} | Username: {} | Password: {} | Confirm (y/n): ",
+            role_text,
+            username,
+            "*".repeat(password.len())
+        ))?;
+
+        if confirm != "y" {
+            err!(anyhow!("💨 Aborted, no changes were made"));
+        }
+    }
+    let res = API::new(&user.remote_url)?
+        .create_new_user(&username, &password, &role, user.remote_token.as_str())
+        .await?;
+    println!("{}", res);
+    Ok(())
+}

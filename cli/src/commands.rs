@@ -57,6 +57,10 @@ pub enum Commands {
         #[arg(short = 's', long, default_value_t = false)]
         skip_confirm: bool,
     },
+    User {
+        #[command(subcommand)]
+        com: UserCommands,
+    },
     Logout,
     Whoami,
     Secret {
@@ -80,6 +84,24 @@ pub enum Commands {
     },
     New {
         name: Option<String>,
+    },
+}
+
+#[derive(Subcommand, Clone)]
+pub enum UserCommands {
+    List,
+    Create {
+        #[arg(short = 'u', long, help = "username of new user", default_value = None)]
+        username: Option<String>,
+
+        #[arg(short = 'p', long, help = "password of new user", default_value = None)]
+        password: Option<String>,
+
+        #[arg(short = 'r', long, help = "role of new user", default_value = None)]
+        role: Option<String>,
+
+        #[arg(short = 's', long, default_value_t = false)]
+        skip_confirm: bool,
     },
 }
 

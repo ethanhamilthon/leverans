@@ -1,4 +1,4 @@
-FROM node:21-bullseye-slim as base
+FROM amd64/node:21-slim as base
 
 ENV NODE_ENV production
 

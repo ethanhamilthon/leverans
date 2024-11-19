@@ -8,11 +8,14 @@ use std::{
 
 use anyhow::{anyhow, Result};
 use bollard::{
-    image::{BuildImageOptions, CreateImageOptions, ImportImageOptions, ListImagesOptions},
+    image::{
+        BuildImageOptions, BuilderVersion, CreateImageOptions, ImportImageOptions,
+        ListImagesOptions,
+    },
     secret::BuildInfo,
 };
 use bytes::Bytes;
-use futures_util::{Stream, StreamExt};
+use futures_util::{stream, Stream, StreamExt};
 use ignore::gitignore::{Gitignore, GitignoreBuilder};
 use serde::Serialize;
 use tar::Builder;
@@ -110,6 +113,7 @@ impl DockerService {
 
         // Открываем контекст сборки (архивированный контекст или директорию)
         let build_context = Self::create_tar_context(context).await.unwrap();
+        // println!("Context size: {} bytes", build_context.len());
 
         // Запускаем сборку образа
         let build_stream = self
@@ -194,4 +198,31 @@ async fn build_image_test() {
         )
         .await
         .unwrap();
+}
+
+#[tokio::test]
+async fn buildtest() {
+    let docker = DockerService::new().unwrap();
+    let mut stream = docker
+        .build_image(
+            "Dockerfile",
+            "exnext-frontend-image:1731963423459",
+            "/Users/erdanaerbol/pj/exnext/exnext",
+            Some("linux/amd64"),
+        )
+        .await
+        .unwrap();
+    while let Some(msg) = stream.next().await {
+        match msg {
+            Ok(msg) => {
+                let text = msg.stream.unwrap_or("".to_string());
+                println!("{}", text);
+            }
+            Err(err) => {
+                dbg!(&err);
+                let err_str = err.to_string();
+                panic!("{}", err_str);
+            }
+        }
+    }
 }

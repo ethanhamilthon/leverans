@@ -53,6 +53,7 @@ pub async fn new_build_images(
         let rx = rx.clone();
         let docker = docker.clone();
         joined_tasks.push(tokio::spawn(async move {
+            // dbg!(&task);
             let loader = new_loader(format!("building {}", task.short_name));
             defer! {
                 loader.finish()
@@ -78,9 +79,14 @@ pub async fn new_build_images(
                     ok!(task.short_name.clone())
                 }
                 match msg {
-                    Ok(msg) => logs.push(msg.stream.unwrap_or("".to_string())),
+                    Ok(msg) => {
+                        let text = msg.stream.unwrap_or("".to_string());
+                        // println!("{}", text);
+                        logs.push(text);
+                    }
                     Err(err) => {
                         let err_str = err.to_string();
+                        // println!("{}", err_str);
                         logs.push(err_str.clone());
                         err!((task.short_name.clone(), logs))
                     }

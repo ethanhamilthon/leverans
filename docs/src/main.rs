@@ -5,18 +5,10 @@ use actix_web::{
 };
 use askama::Template;
 use content::{get_global_menu, get_html_page, MenuFolder};
+use install::{install_cli_script, install_manager, uninstall_manager};
 
 pub mod content;
 pub mod install;
-
-async fn install_script() -> Result<impl Responder> {
-    Ok(HttpResponse::Ok().content_type("text/plain").body(
-        r#"
-    #!/bin/bash
-    echo "Installing Lev Docs..."
-    "#,
-    ))
-}
 
 async fn index(req: actix_web::HttpRequest) -> Result<impl Responder> {
     let now = std::time::Instant::now();
@@ -46,7 +38,9 @@ async fn main() -> std::io::Result<()> {
     println!("Server starting in http://localhost:8082/");
     HttpServer::new(move || {
         App::new()
-            .route("/install.sh", web::get().to(install_script))
+            .route("/install.sh", web::get().to(install_cli_script))
+            .route("/manager.sh", web::get().to(install_manager))
+            .route("/uninstall.sh", web::get().to(uninstall_manager))
             .default_service(web::route().to(index))
             .service(fs::Files::new("/static", "./static").show_files_listing())
     })

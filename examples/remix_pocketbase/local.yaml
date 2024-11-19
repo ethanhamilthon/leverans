@@ -3,7 +3,8 @@ project: remix-test
 apps:
   front:
     build: manual
-    domain: remix.ethanapp.de
+    https: false
+    domain: remix.localhost
     port: 3000
     envs:
       PB_URL: "{{ this.pocketbase.internal }}"
@@ -13,5 +14,6 @@ services:
     image: ghcr.io/muchobien/pocketbase:latest
     volumes:
       pbdata: /pb_data
-    domain: pb.ethanapp.de
+    domain: pb.localhost
     port: 8090
+    https: false
