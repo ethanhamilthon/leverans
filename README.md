@@ -1,17 +1,19 @@
-# Deploy anything to Internet in one click
+# Deploy Anything to the Internet in One Click
 
-Leverans is a tool that automates the deployment of applications and services to the web.
-Helping you deploy everything in a bluntly simpler way, while leaving you in full control.
+Leverans is a deployment tool that makes launching applications and services to the web straightforward and fast.
+It automates the heavy lifting while keeping you in full control.
 
-Works on top of Docker, uses Traefik for reverse proxy, Written in Rust.
+**Powered by Docker, uses Traefik as a reverse proxy, built with Rust.**
 
-Unlike other open source solutions (Coolify, Kamal, Dokploy, etc):
+## What Makes Leverans Different?
 
-- You can deploy anything you want, any way you want.
-- No SSH, No RCE, No DocketHub, No Git required.
-- Works via CLI, all project configuration in one config file.
-- You can deploy/update the whole project through one command.
-- Works on any server ( min requirement: 0.5 vCPU, 500 mb RAM ).
+Unlike other open-source solutions (Coolify, Kamal, Dokploy, etc.):
+
+- Deploy anything, any way you want.
+- No need for SSH, RCE, DockerHub, or Git.
+- CLI-based, with all configurations in a single file.
+- Deploy or update entire projects with one command.
+- Works on any server with minimal requirements (0.5 vCPU, 500 MB RAM).
 
 ## Documentation
 
@@ -20,20 +22,17 @@ Unlike other open source solutions (Coolify, Kamal, Dokploy, etc):
 
 ## Installation
 
-Leverans consists of 2 components: Server and CLI tool. Both will need to be installed in order for the system to work correctly.
+Leverans includes two components:
 
-### Server part
+### 1. Server – Install on a server with a public IP for production or locally for testing.
 
-To install a server part for production use you need a server with a public IP address (All VPS/VDS providers give it by default).
-Also for testing and local use you can install on your local computer, but it will work only from local network.
+### 2. CLI – Install where your code resides. Supports Linux, macOS, and Windows on amd64 and arm64.
 
-### CLI part
+## Quick Start
 
-The CLI tool should be installed where your code is. Supported by Linux, Macos, Windows on amd64 and arm64 architectures.
-
-## Fast start
+Get started fast with clear, easy-to-follow guides in [our documentation.](https://docs.leverans.dev)
 
 ## Version
 
-The current 0.2.0 is the first stable version.
-We have big plans, so there may be a breaking update in the future. In 0.5.0 we are expecting a full-fledged ideaogical project.
+**Current Version: 0.2.0**
+This is the first stable release. Big updates are planned, with version 0.5.0 aiming to deliver a complete, fully refined solution.

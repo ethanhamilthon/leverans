@@ -5,19 +5,18 @@ folder: "start"
 order: 2
 ---
 
-## Why It Matters
+## What are we striving for?
 
-Leverans makes deployment simpler and faster, addressing the pain points of manual setups.
-It provides the best price/performance balance for DIY deployment on VPS,
-avoiding the complexities of Kubernetes and the costs of managed services like Fly.io or Vercel.
+We are not alone in tackling the challenge of deploying applications so they run smoothly every time while keeping the
+process simple and fast. Many share this goal, but we take a unique approach to solving it.
 
-## Core Principles
+Docker has already set the standard for application packaging, and Docker Swarm handles container orchestration effectively for
+small to medium-scale setups. But the real bottleneck lies in repetitive tasks: building images, pushing them to registries,
+creating or updating services, linking them, configuring reverse proxies with SSL, and more. These tasks are dull, prone to errors,
+and distract developers from what truly matters—the application itself.
 
-**Safety:** Prevents human errors and keeps services stable, even during failures.
-
-**Simplicity:** Everything that can be automated is automated, leaving only critical decisions up to you.
-
-**Speed:** In fast-paced CI/CD, speed is essential. The faster you ship features, the better you stay ahead of competitors.
+Our mission is to build a complete solution that automates these steps, freeing developers to focus on meaningful decisions.
+Let the infrastructure handle itself, so you can build better, faster, and smarter.
 
 ## Key Features
 

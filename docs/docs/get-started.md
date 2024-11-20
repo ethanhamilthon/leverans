@@ -5,17 +5,41 @@ folder: "start"
 order: 1
 ---
 
-# Deploy anything to Internet in one click
+# Deploy Anything to the Internet in One Click
 
-Leverans is a tool that automates the deployment of applications and services to the web.
-Helping you deploy everything in a bluntly simpler way, while leaving you in full control.
+Leverans is a deployment tool that makes launching applications and services to the web straightforward and fast.
+It automates the heavy lifting while keeping you in full control.
 
-Works on top of Docker, uses Traefik for reverse proxy, Written in Rust.
+**Powered by Docker, uses Traefik as a reverse proxy, built with Rust.**
 
-Unlike other open source solutions (Coolify, Kamal, Dokploy, etc):
+## What Makes Leverans Different?
 
-- You can deploy anything you want, any way you want.
-- No SSH, No RCE, No DocketHub, No Git required.
-- Works via CLI, all project configuration in one config file.
-- You can deploy/update the whole project through one command.
-- Works on any server ( min requirement: 0.5 vCPU, 500 mb RAM ).
+Unlike other open-source solutions (Coolify, Kamal, Dokploy, etc.):
+
+- Deploy anything, any way you want.
+- No need for SSH, RCE, DockerHub, or Git.
+- CLI-based, with all configurations in a single file.
+- Deploy or update entire projects with one command.
+- Works on any server with minimal requirements (0.5 vCPU, 500 MB RAM).
+
+## Documentation
+
+- Docs: [https://docs.leverans.dev](https://docs.leverans.dev)
+- Examples: [https://github.com/ethanhamilthon/leverans/tree/main/examples](https://github.com/ethanhamilthon/leverans/tree/main/examples)
+
+## Installation
+
+Leverans includes two components:
+
+### 1. Server – Install on a server with a public IP for production or locally for testing.
+
+### 2. CLI – Install where your code resides. Supports Linux, macOS, and Windows on amd64 and arm64.
+
+## Quick Start
+
+Get started fast with clear, easy-to-follow guides in [our documentation.](https://docs.leverans.dev)
+
+## Version
+
+**Current Version: 0.2.0**
+This is the first stable release. Big updates are planned, with version 0.5.0 aiming to deliver a complete, fully refined solution.
