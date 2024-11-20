@@ -11,7 +11,7 @@ use anyhow::{anyhow, Result as AnyResult};
 use bcrypt::verify;
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
-use shared::{ok, UserAuthBody};
+use shared::{ok, UserAuthBody, UserSafe};
 
 use crate::repo::user_repo::{RoleType, User};
 
@@ -80,12 +80,6 @@ impl CreateUserBody {
             _ => RoleType::ReadOnly,
         }
     }
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct UserSafe {
-    username: String,
-    role: String,
 }
 
 pub async fn user_list(sd: web::Data<Arc<ServerData>>, req: HttpRequest) -> Result<impl Responder> {

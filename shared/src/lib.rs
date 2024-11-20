@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Result};
+use serde::{Deserialize, Serialize};
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -150,4 +151,10 @@ pub fn get_unix_millis() -> u128 {
     now.duration_since(UNIX_EPOCH)
         .expect("Time went backwards")
         .as_millis()
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct UserSafe {
+    pub username: String,
+    pub role: String,
 }

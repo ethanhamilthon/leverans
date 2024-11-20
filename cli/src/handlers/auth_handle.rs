@@ -205,3 +205,12 @@ pub async fn create_user(
     println!("{}", res);
     Ok(())
 }
+
+pub async fn list_user() -> Result<()> {
+    let user = UserData::load_db(false).await?.load_current_user().await?;
+    let users = API::new(&user.remote_url)?
+        .list_user(user.remote_token.as_str())
+        .await?;
+    println!("{}\n", serde_json::to_string_pretty(&users)?);
+    Ok(())
+}

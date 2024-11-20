@@ -136,7 +136,7 @@ impl User {
 pub const USER_MIGRATION: &str = r#"
     create table if not exists users (
         id text primary key,
-        username text not null,
+        username text not null unique,
         password_hash text not null,
         role text not null
     );

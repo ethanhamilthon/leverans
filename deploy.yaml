@@ -1,0 +1,11 @@
+project: lev-docs
+
+apps:
+  main:
+    build: manual
+    dockerfile: Dockerfile.docs
+    proxy:
+      - domain: docs.leverans.dev
+        port: 8000
+      - domain: leverans.dev
+        port: 8000

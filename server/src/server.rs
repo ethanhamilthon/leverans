@@ -1,7 +1,9 @@
 use std::{sync::Arc, time::Instant};
 
 use actix_web::{dev::Service, web, App, HttpServer};
-use auth_handler::{create_new_user, handle_is_super_user_exists, login_user, register_super_user};
+use auth_handler::{
+    create_new_user, handle_is_super_user_exists, login_user, register_super_user, user_list,
+};
 use deploy_handler::handle_deploy;
 use docker_handler::upload;
 use futures::FutureExt;
@@ -71,6 +73,7 @@ pub async fn start_server(server: ServerData) -> std::io::Result<()> {
             .route("/secret", web::delete().to(handle_delete_secret))
             .route("/secret", web::put().to(handle_update_secret))
             .route("/users", web::post().to(create_new_user))
+            .route("/users", web::get().to(user_list))
     })
     .bind(("0.0.0.0", port))?
     .run()

@@ -89,7 +89,7 @@ pub enum Commands {
 
 #[derive(Subcommand, Clone)]
 pub enum UserCommands {
-    List,
+    Ls,
     Create {
         #[arg(short = 'u', long, help = "username of new user", default_value = None)]
         username: Option<String>,

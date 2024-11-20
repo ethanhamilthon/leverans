@@ -1,21 +1,9 @@
 ---
-title: "What is Leverans?"
-path: "overview"
+title: "Features & Vision"
+path: "features"
 folder: "start"
-order: 1
+order: 2
 ---
-
-# What is Leverans?
-
-Leverans is an open-source, next-gen deployment tool that simplifies deploying applications on VPS, VDS, and physical servers. With a user-friendly CLI, it lets you manage and deploy applications in just one click.
-
-## How It Works
-
-Spend 15 minutes setting up the components on your server and local machine. Run _lev auth -a [your-ip]_ to link your machine,
-and you are ready to go. Deploying is as simple as creating a config file and running _lev deploy_.
-
-Leverans checks the system’s current state and analyzes your config to create a task sequence.
-Leverans uses Docker Swarm and Traefik for core operations but includes its own implementations where needed for reliability.
 
 ## Why It Matters
 

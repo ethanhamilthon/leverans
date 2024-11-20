@@ -17,7 +17,7 @@ async fn index(req: actix_web::HttpRequest) -> Result<impl Responder> {
         Ok(file) => file,
         Err(_) => {
             return Ok(HttpResponse::Found()
-                .append_header(("LOCATION", "/start/overview"))
+                .append_header(("LOCATION", "/start/get-started"))
                 .finish())
         }
     };
@@ -35,7 +35,7 @@ async fn index(req: actix_web::HttpRequest) -> Result<impl Responder> {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    println!("Server starting in http://localhost:8082/");
+    println!("Server starting in http://localhost:8000/");
     HttpServer::new(move || {
         App::new()
             .route("/install.sh", web::get().to(install_cli_script))
@@ -44,7 +44,7 @@ async fn main() -> std::io::Result<()> {
             .default_service(web::route().to(index))
             .service(fs::Files::new("/static", "./static").show_files_listing())
     })
-    .bind(("127.0.0.1", 8082))?
+    .bind(("0.0.0.0", 8000))?
     .run()
     .await
 }

@@ -4,7 +4,7 @@ use reqwest::{multipart::Form, StatusCode};
 use serde_json::{self, json};
 
 use anyhow::{anyhow, Result};
-use shared::{deployable::deploy::Deploy, err, ok, Secret, UserAuthBody};
+use shared::{deployable::deploy::Deploy, err, ok, Secret, UserAuthBody, UserSafe};
 use url::Url;
 
 pub struct API {
@@ -223,6 +223,26 @@ impl API {
             Err(anyhow!("Failed to login super user: {}", error_text))
         }
     }
+    pub async fn list_user(&self, token: &str) -> Result<Vec<UserSafe>> {
+        let mut super_user_url = self.main_url.clone();
+        super_user_url.set_path("/users");
+
+        let res = self
+            .req_client
+            .get(super_user_url)
+            .header("Content-Type", "application/json")
+            .header("X-LEVERANS-PASS", "true")
+            .header("Authorization", token)
+            .send()
+            .await?;
+        if res.status().is_success() {
+            let text = res.text().await?;
+            Ok(serde_json::from_str(&text)?)
+        } else {
+            let error_text = res.text().await?;
+            Err(anyhow!("Failed to login super user: {}", error_text))
+        }
+    }
 
     pub async fn create_new_user(
         &self,
@@ -253,7 +273,7 @@ impl API {
             Ok(res.text().await?)
         } else {
             let error_text = res.text().await?;
-            Err(anyhow!("Failed to login super user: {}", error_text))
+            Err(anyhow!("Failed to create new user: {}", error_text))
         }
     }
 
