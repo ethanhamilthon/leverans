@@ -7,8 +7,7 @@ order: 3
 
 # Quick Start: Launch first project
 
-Before you start, you need to download Leverans to your server and locally.
-If you haven't installed it yet, go to our [installation guide.](/start/install)
+Before you start, you need to download Leverans to your server and locally. If you haven't installed it yet, go to our [installation guide.](/start/install)
 
 ## Authentication
 
@@ -34,13 +33,11 @@ Go to the root folder of your project, and run:
 lev new [your-project-name]
 ```
 
-Now a file named _deploy.yaml_ has been created in the root of your project.
-If it was not created, you can create it manually.
+Now a file named _deploy.yaml_ has been created in the root of your project. If it was not created, you can create it manually.
 
 ## Configuration and Deployment
 
-First, let's change the file for the base deployment of our application.
-You can read all the options of the [configuration file here.](/config/file)
+First, let's change the file for the base deployment of our application. You can read all the options of the [configuration file here.](/config/file)
 
 ```yaml
 project: my-awesome-project
@@ -51,9 +48,7 @@ apps:
     port: 8080
 ```
 
-Here we have created a configuration for a single application.
-You must have a Dockerfile next to the deploy.yaml file.
-Since Leverans uses docker to deploy your application.
+Here we have created a configuration for a single application. You must have a Dockerfile next to the deploy.yaml file. Since Leverans uses docker to deploy your application.
 
 Now the last step is to execute the command:
 
@@ -61,19 +56,17 @@ Now the last step is to execute the command:
 lev deploy
 ```
 
-And that's it! Within a couple of minutes the application will be finished building and
-deployed to the Leverans cluster.
+And that's it! Within a couple of minutes the application will be finished building and deployed to the Leverans cluster.
 
 After successful deployment you can go to _api.mydomain.com_ to check if everything went well.
 
 ## Updating and Creating a Database
 
 Now let's imagine that we decided to use a database in our application.
-We use any database we want, since Leverans allows us to host any application that runs on Docker.
 
-But Leverans has a couple of options [already configured](/databases/ready-to-go). Let's choose the most popular one - Postgresql.
+Leverans has a couple of options [already configured](/databases/ready-to-go). Let's choose the most popular one - Postgresql.
 
-Now we need to do two things: Create a database and connect to it from our application. Let's modify our config file:
+Now we need to do two things: Create a database and connect to our application. Let's modify our config file:
 
 ```yaml
 project: my-awesome-project
@@ -92,9 +85,7 @@ databases:
 
 As you can see, another field, _databases_, has appeared on the level with _apps_.
 
-And since our application needs the address of connection to the database,
-we passed there env variable `DATABASE_URL`. Here we used a thing called [Smart String](/concept/smart-strings).
-In short, it's just a way of telling Leverans: “Hey, put a connection string of maindb database here”.
+And since our application needs the address of connection to the database, we passed there env variable `DATABASE_URL`. Here we used a thing called [Smart String](/concept/smart-strings). In short, it's just a way of telling Leverans: “Hey, put a connection string of maindb database here”.
 
 Now once again you just have to execute the command:
 
@@ -102,9 +93,7 @@ Now once again you just have to execute the command:
 lev deploy
 ```
 
-And that's it, now we have an application running in a production environment that works with the postgesql database.
-All this is managed with Docker Swarm and Leverans Manager. In the future you can simply create new features for your application,
-add new applications/databases/services to the current project and so on.
+And that's it, now we have an application running in a production environment that works with the postgesql database. All this is managed with Docker Swarm and Leverans Manager. In the future you can simply create new features for your application, add new applications/databases/services to the current project and so on.
 
 ## So what's next?
 

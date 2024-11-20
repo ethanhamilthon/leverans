@@ -1,0 +1,11 @@
+project: react-caddy
+
+apps:
+  main:
+    build: manual
+    replicas: 1
+    proxy:
+      - domain: react.leverans.dev
+        port: 80
+      - domain: react-caddy.leverans.dev
+        port: 80

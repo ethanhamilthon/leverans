@@ -7,8 +7,7 @@ order: 1
 
 # Deploy Anything to the Internet in One Click
 
-Leverans is a deployment tool that makes launching applications and services to the web straightforward and fast.
-It automates the heavy lifting while keeping you in full control.
+Leverans is a deployment tool that makes launching applications and services to the web straightforward and fast. It automates the heavy lifting while keeping you in full control.
 
 **Powered by Docker, uses Traefik as a reverse proxy, built with Rust.**
 
@@ -37,9 +36,10 @@ Leverans includes two components:
 
 ## Quick Start
 
-Get started fast with clear, easy-to-follow guides in [our documentation.](https://docs.leverans.dev)
+Get started fast with clear, easy-to-follow guides in [our documentation.](https://docs.leverans.dev/start/quick-start)
 
 ## Version
 
 **Current Version: 0.2.0**
+
 This is the first stable release. Big updates are planned, with version 0.5.0 aiming to deliver a complete, fully refined solution.
