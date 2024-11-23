@@ -1,0 +1,65 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # Запускается при пуше тега, например v1.0.0
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        arch: [x86_64, aarch64]  # Добавляем ARM архитектуры
+        # Платформы и архитектуры для сборки
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up Rust
+        uses: actions/setup-rust@v1
+        with:
+          rust-version: '1.70.0'  # Укажите версию Rust
+
+      - name: Build project on ${{ matrix.os }} ${{ matrix.arch }}
+        run: |
+          TARGET="${{ matrix.arch }}-${{ matrix.os == 'windows-latest' && 'pc-windows-msvc' || matrix.os == 'macos-latest' && 'apple-darwin' || 'unknown-linux-gnu' }}"
+          cargo build --release -p lev --target $TARGET
+          echo "Build completed for $TARGET"
+
+      - name: Archive build artifacts
+        run: |
+          mkdir release
+          if [ "${{ matrix.os }}" == "windows-latest" ]; then
+            mv target/${{ matrix.arch }}-pc-windows-msvc/release/lev.exe release/lev-${{ matrix.arch }}-windows.exe
+          elif [ "${{ matrix.os }}" == "macos-latest" ]; then
+            mv target/${{ matrix.arch }}-apple-darwin/release/lev release/lev-${{ matrix.arch }}-macos
+          else
+            mv target/${{ matrix.arch }}-unknown-linux-gnu/release/lev release/lev-${{ matrix.arch }}-linux
+          fi
+
+      - name: Upload release assets
+        if: success()
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            release/lev-x86_64-windows.exe
+            release/lev-aarch64-windows.exe
+            release/lev-x86_64-macos
+            release/lev-aarch64-macos
+            release/lev-x86_64-linux
+            release/lev-aarch64-linux
+
+      - name: Create GitHub release
+        if: success()
+        uses: gh actions/create-release@v1
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          body: 'Release description here'
+          draft: false
+          prerelease: false
+
