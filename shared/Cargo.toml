@@ -14,9 +14,6 @@ dirs = "5.0.1"
 futures-util = "0.3.31"
 http-body-util = "0.1.2"
 httparse = "1.9.5"
-hyper = { version = "1.5.0", features = ["full", "client"]}
-hyper-util = "0.1.10"
-hyperlocal = "0.9.1"
 ignore = "0.4.23"
 indicatif = "0.17.9"
 serde = "1.0.210"
@@ -25,7 +22,6 @@ serde_with = "3.11.0"
 serde_yaml = "0.9.34"
 tar = "0.4.42"
 tokio = { version = "1.40.0", features = ["full"] }
-urlencoding = "2.1.3"
 walkdir = "2.5.0"
 
 [dev-dependencies]

@@ -10,13 +10,11 @@ pub mod volume;
 #[derive(Debug, Clone)]
 pub struct DockerService {
     conn: Arc<Docker>,
-    custom_api: Arc<custom::CustomApi>,
 }
 
 impl DockerService {
     pub fn new() -> Result<Self> {
         Ok(DockerService {
-            custom_api: Arc::new(custom::CustomApi::new()),
             conn: Arc::new(Docker::connect_with_socket_defaults()?),
         })
     }
