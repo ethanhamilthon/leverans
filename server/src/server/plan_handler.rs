@@ -5,7 +5,10 @@ use actix_web::{
 };
 use serde::Deserialize;
 use shared::{
-    deployable::deploy::{plan, PlanParamaters},
+    deployable::{
+        deploy::{plan, PlanParamaters},
+        rollback::{rollback, RollBackParams},
+    },
     ok, SecretValue,
 };
 
@@ -18,6 +21,65 @@ pub struct PlanBody {
     pub config: String,
     pub filter: Option<Vec<String>>,
     pub to_build: Option<Vec<String>>,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct RollBackBody {
+    pub config: String,
+}
+
+pub async fn handle_rollback(
+    sd: web::Data<Arc<ServerData>>,
+    body: web::Json<RollBackBody>,
+    req: HttpRequest,
+) -> Result<impl Responder> {
+    must_auth(
+        &req,
+        vec![
+            RoleType::FullAccess,
+            RoleType::SuperUser,
+            RoleType::UpdateOnly,
+            RoleType::ReadOnly,
+        ],
+    )?;
+    let last_deploys: Vec<_> = DeployData::get_last_deploys(&sd.repo.pool, 1)
+        .await
+        .map_err(|e| {
+            dbg!(e);
+            InternalError::new(
+                "Failed to get last deploys",
+                StatusCode::from_u16(500).unwrap(),
+            )
+        })?
+        .into_iter()
+        .map(|d| (d.project_name, d.deploys))
+        .collect();
+    let prelast_deploys: Vec<_> = DeployData::get_last_deploys(&sd.repo.pool, 2)
+        .await
+        .map_err(|e| {
+            dbg!(e);
+            InternalError::new(
+                "Failed to get last deploys",
+                StatusCode::from_u16(500).unwrap(),
+            )
+        })?
+        .into_iter()
+        .map(|d| (d.project_name, d.deploys))
+        .collect();
+
+    let params = RollBackParams {
+        main_config: body.config.clone(),
+        last_deploys,
+        prelast_deploys,
+    };
+    let final_deploys = rollback(params).map_err(|e| {
+        dbg!(e);
+        InternalError::new(
+            "Failed to get last deploys",
+            StatusCode::from_u16(500).unwrap(),
+        )
+    })?;
+    Ok(HttpResponse::Ok().json(final_deploys))
 }
 
 pub async fn handle_plan(
@@ -49,7 +111,7 @@ pub async fn handle_plan(
             value: s.value,
         })
         .collect();
-    let deploys: Vec<_> = DeployData::get_last_deploys(&sd.repo.pool)
+    let deploys: Vec<_> = DeployData::get_last_deploys(&sd.repo.pool, 1)
         .await
         .map_err(|e| {
             dbg!(e);

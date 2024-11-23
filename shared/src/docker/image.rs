@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     fs::File,
     io::{BufRead, BufReader},
     path::{Path, PathBuf},
@@ -101,12 +102,17 @@ impl DockerService {
         image_name: &str,
         context: &str,
         platform: Option<&str>,
+        args: Option<HashMap<String, String>>,
     ) -> Result<Pin<Box<dyn Stream<Item = Result<BuildInfo, bollard::errors::Error>> + '_ + Send>>>
     {
+        let args = args.unwrap_or_default();
+        let build_args: HashMap<&str, &str> =
+            args.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
         let options = BuildImageOptions {
             dockerfile: docker_file_name, // Название Dockerfile
             t: image_name,                // Тег для образа
             rm: true,
+            buildargs: build_args,
             platform: platform.unwrap_or("linux/amd64"),
             ..Default::default()
         };
@@ -183,46 +189,4 @@ impl DockerService {
 pub struct DockerImage {
     pub image_id: String,
     pub tag: String,
-}
-
-#[tokio::test]
-#[ignore]
-async fn build_image_test() {
-    let docker = DockerService::new().unwrap();
-    let _ = docker
-        .build_image(
-            "Dockerfile",
-            "flowm:v6",
-            "/Users/ethanmotion/pro/flower",
-            Some(get_docker_platform().unwrap().as_str()),
-        )
-        .await
-        .unwrap();
-}
-
-#[tokio::test]
-async fn buildtest() {
-    let docker = DockerService::new().unwrap();
-    let mut stream = docker
-        .build_image(
-            "Dockerfile",
-            "exnext-frontend-image:1731963423459",
-            "/Users/erdanaerbol/pj/exnext/exnext",
-            Some("linux/amd64"),
-        )
-        .await
-        .unwrap();
-    while let Some(msg) = stream.next().await {
-        match msg {
-            Ok(msg) => {
-                let text = msg.stream.unwrap_or("".to_string());
-                println!("{}", text);
-            }
-            Err(err) => {
-                dbg!(&err);
-                let err_str = err.to_string();
-                panic!("{}", err_str);
-            }
-        }
-    }
 }

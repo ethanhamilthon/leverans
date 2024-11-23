@@ -29,6 +29,28 @@ pub enum Commands {
 
         #[arg(short = 's', long, default_value_t = false)]
         skip_confirm: bool,
+
+        #[arg(short = 'u', long, default_value_t = false)]
+        unfold: bool,
+
+        #[arg(short = 't', long, default_value = None)]
+        timeout: Option<u64>,
+    },
+    Rollback {
+        #[arg(short = 'f', long, default_value = "deploy.yaml")]
+        file: String,
+
+        #[arg(short = 'c', long, default_value = "./")]
+        context: String,
+
+        #[arg(short = 's', long, default_value_t = false)]
+        skip_confirm: bool,
+
+        #[arg(short = 'u', long, default_value_t = false)]
+        unfold: bool,
+
+        #[arg(short = 't', long, default_value = None)]
+        timeout: Option<u64>,
     },
     Version,
     Auth {
@@ -81,6 +103,9 @@ pub enum Commands {
 
         #[arg(short, long, default_value = None)]
         only: Option<Vec<String>>,
+
+        #[arg(short = 'u', long, default_value_t = false)]
+        unfold: bool,
     },
     New {
         name: Option<String>,
@@ -121,7 +146,9 @@ pub enum SecretCommands {
         value: Option<String>,
     },
     Delete {
-        #[arg(short = 'k', long, default_value = None)]
+        key: Option<String>,
+    },
+    Show {
         key: Option<String>,
     },
 }

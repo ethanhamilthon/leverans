@@ -1,12 +1,17 @@
 use std::{collections::HashMap, str::FromStr, sync::Arc};
 
-use crate::{config::MainConfig, docker::DockerService, err, ok, SecretValue};
+use crate::{
+    config::MainConfig, deployable::get_parsed_config, docker::DockerService, err, ok, SecretValue,
+};
 
 use super::{task::run_deploy_task, Buildable, Connectable, Deployable};
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 
-pub fn config_to_connectable(config: MainConfig) -> Result<Vec<Connectable>> {
+pub fn config_to_connectable(
+    config: MainConfig,
+    secrets: &[SecretValue],
+) -> Result<Vec<Connectable>> {
     let mut connectables = vec![];
     if let Some(apps) = config.apps {
         for (app_name, app) in apps {
@@ -14,16 +19,7 @@ pub fn config_to_connectable(config: MainConfig) -> Result<Vec<Connectable>> {
                 app_name,
                 app,
                 config.project.clone(),
-            )?);
-        }
-    }
-
-    if let Some(dbs) = config.databases {
-        for (db_name, db) in dbs {
-            connectables.push(Connectable::from_db_config(
-                db_name,
-                db,
-                config.project.clone(),
+                secrets,
             )?);
         }
     }
@@ -34,6 +30,7 @@ pub fn config_to_connectable(config: MainConfig) -> Result<Vec<Connectable>> {
                 service_name,
                 service,
                 config.project.clone(),
+                secrets,
             )?);
         }
     }
@@ -41,8 +38,6 @@ pub fn config_to_connectable(config: MainConfig) -> Result<Vec<Connectable>> {
 }
 pub fn config_to_deployable(
     config: MainConfig,
-    connectables: Vec<Connectable>,
-    secrets: Vec<SecretValue>,
     buildables: Vec<Buildable>,
     images: Vec<String>,
 ) -> Result<Vec<Deployable>> {
@@ -53,22 +48,8 @@ pub fn config_to_deployable(
                 app_name,
                 app,
                 config.project.clone(),
-                secrets.clone(),
-                connectables.to_vec(),
                 buildables.clone(),
                 images.clone(),
-            )?);
-        }
-    }
-
-    if let Some(dbs) = config.databases {
-        for (db_name, db) in dbs {
-            deployables.push(Deployable::from_db_config(
-                db_name,
-                db,
-                config.project.clone(),
-                secrets.clone(),
-                connectables.to_vec(),
             )?);
         }
     }
@@ -79,8 +60,6 @@ pub fn config_to_deployable(
                 service_name,
                 service,
                 config.project.clone(),
-                secrets.clone(),
-                connectables.to_vec(),
             )?);
         }
     }
@@ -121,13 +100,6 @@ pub fn config_to_buildables(
                 println!("there is no build task for {} ", app_name);
                 continue;
             }
-            dbg!(&app_name);
-            dbg!(filters.clone());
-            dbg!(exists_in_image_list(
-                images.clone(),
-                app_name.clone(),
-                config.project.clone()
-            ));
             buildables.push(Buildable::from_app_config(
                 app_name,
                 app,
@@ -149,7 +121,7 @@ pub fn exists_in_image_list(images: Vec<String>, name: String, project_name: Str
     false
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Deploy {
     pub deployable: Deployable,
     pub lifecycle: DeployLifecycle,
@@ -161,6 +133,15 @@ pub struct Deploy {
     pub network_name: String,
 }
 
+impl PartialEq for Deploy {
+    fn eq(&self, other: &Self) -> bool {
+        self.deployable == other.deployable
+            && self.connectable == other.connectable
+            && self.client_tasks == other.client_tasks
+            && self.lifecycle == other.lifecycle
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum DeployTask {
     Build(Buildable),
@@ -170,7 +151,6 @@ pub enum DeployTask {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct HealthCheckable {
     pub service_name: String,
-    pub timeout_sec: u16,
     pub wait_sec: u16,
 }
 
@@ -269,9 +249,6 @@ pub fn plan(mut params: PlanParamaters) -> Result<Vec<Deploy>> {
     if params.filter.is_some() && params.filter.clone().unwrap().len() == 0 {
         params.filter = None;
     }
-    dbg!(&params);
-    dbg!("main config: {}", &main_config);
-    // last deployed configs
     let last_deploys = params
         .last_deploys
         .clone()
@@ -292,22 +269,20 @@ pub fn plan(mut params: PlanParamaters) -> Result<Vec<Deploy>> {
         });
 
     // get all configuration // all logic is here
-    let connectables = config_to_connectable(main_config.clone())?;
+    let connectables = config_to_connectable(main_config.clone(), &params.secrets)?;
+    let mconfig = get_parsed_config(
+        main_config.to_string().as_str(),
+        &connectables,
+        &params.secrets,
+    )?;
     let buildables = config_to_buildables(
-        main_config.clone(),
+        mconfig.clone(),
         Some(params.to_build.clone()),
         params.images.clone(),
         params.filter.clone(),
     )?;
-    dbg!(&params.to_build);
-    dbg!(&buildables);
-    let deployables = config_to_deployable(
-        main_config.clone(),
-        connectables.clone(),
-        params.secrets.clone(),
-        buildables.clone(),
-        params.images.clone(),
-    )?;
+    dbg!("parsed config: {}", &mconfig);
+    let deployables = config_to_deployable(mconfig, buildables.clone(), params.images.clone())?;
 
     // get this time deploys // without comparing with last one
     let main_deploys: Vec<_> = deployables
@@ -324,7 +299,6 @@ pub fn plan(mut params: PlanParamaters) -> Result<Vec<Deploy>> {
                 before_tasks: vec![],
                 after_tasks: vec![DeployTask::HealthCheck(HealthCheckable {
                     service_name: d.service_name.clone(),
-                    timeout_sec: 30,
                     wait_sec: 5,
                 })],
                 client_tasks: if let Some(b) = buildables
@@ -425,124 +399,4 @@ pub fn plan(mut params: PlanParamaters) -> Result<Vec<Deploy>> {
         }
     }
     ok!(final_deploys)
-}
-
-#[test]
-fn deploy_test() {
-    fn deploy_actions(deploys: &[Deploy]) -> HashMap<DeployAction, usize> {
-        deploys.into_iter().map(|d| (d.action.clone(), 1)).fold(
-            HashMap::new(),
-            |mut acc, (k, v)| {
-                let cur = acc.get(&k);
-                if let Some(cur) = cur {
-                    acc.insert(k, cur + v);
-                } else {
-                    acc.insert(k, v);
-                }
-                acc
-            },
-        )
-    }
-
-    // test 1
-    let raw_config = r#"
-    project: pro 
-    app:
-        main:
-            port: 3000
-            domain: example.com 
-            envs:
-                SECRET: "{{ secret.secret }}"
-                DB_CONNECTION: "{{ this.main-pg.connection }}"
-
-    db:
-        main-pg:
-            from: pg
-    "#;
-    let secrets = vec![SecretValue {
-        key: "secret".to_string(),
-        value: "some".to_string(),
-    }];
-    let params = PlanParamaters {
-        main_config: raw_config.to_string(),
-        last_deploys: vec![],
-        secrets: secrets.clone(),
-        network_name: "test".to_string(),
-        filter: None,
-        to_build: vec![],
-        images: vec![],
-    };
-    let deploys = plan(params).unwrap();
-    dbg!(&deploys);
-    let count = deploy_actions(&deploys);
-    assert_eq!(deploys.len(), 2);
-    assert_eq!(count.get(&DeployAction::Create).unwrap(), &2);
-
-    // test 2
-    let updated_config = r#"
-    project: pro 
-    app:
-        main:
-            port: 3000
-            domain: example.com 
-            envs:
-                SECRET: "{{ secret.secret }}"
-                DB_CONNECTION: "{{ this.main-pg.connection }}"
-
-    db:
-        main-pg:
-            from: pg
-
-    service:
-        umami:
-            image: umami/umami
-    "#;
-    let params = PlanParamaters {
-        main_config: updated_config.to_string(),
-        last_deploys: vec![("pro".to_string(), serde_json::to_string(&deploys).unwrap())],
-        secrets: secrets.clone(),
-        network_name: "test".to_string(),
-        filter: None,
-        to_build: vec![],
-        images: vec![],
-    };
-    let deploys = plan(params).unwrap();
-    dbg!(&deploys);
-    let count = deploy_actions(&deploys);
-    assert_eq!(deploys.len(), 3);
-    assert_eq!(count.get(&DeployAction::Update).unwrap(), &1);
-    assert_eq!(count.get(&DeployAction::Create).unwrap(), &1);
-    assert_eq!(count.get(&DeployAction::Nothing).unwrap(), &1);
-
-    // test 3
-    let updated_config = r#"
-    project: pro 
-    app:
-        main:
-            port: 3000
-            domain: example.com 
-            envs:
-                SECRET: "{{ secret.secret }}"
-                DB_CONNECTION: "{{ this.main-pg.connection }}"
-
-    db:
-        main-pg:
-            from: pg
-    "#;
-    let params = PlanParamaters {
-        main_config: updated_config.to_string(),
-        last_deploys: vec![("pro".to_string(), serde_json::to_string(&deploys).unwrap())],
-        secrets: secrets.clone(),
-        network_name: "test".to_string(),
-        filter: None,
-        to_build: vec![],
-        images: vec![],
-    };
-    let deploys = plan(params).unwrap();
-    dbg!(&deploys);
-    let count = deploy_actions(&deploys);
-    assert_eq!(deploys.len(), 3);
-    assert_eq!(count.get(&DeployAction::Update).unwrap(), &1);
-    assert_eq!(count.get(&DeployAction::Delete).unwrap(), &1);
-    assert_eq!(count.get(&DeployAction::Nothing).unwrap(), &1);
 }

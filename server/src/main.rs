@@ -4,6 +4,7 @@ use rand::{distributions::Alphanumeric, Rng};
 use server::{auth_handler::change_jwt_secret, start_server, ServerData};
 
 pub mod cron;
+pub mod on_start;
 pub mod repo;
 pub mod server;
 

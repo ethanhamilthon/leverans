@@ -3,15 +3,17 @@ use std::{collections::HashMap, time::Duration};
 
 use bollard::{
     secret::{
-        EndpointPortConfig, EndpointPortConfigPublishModeEnum, EndpointSpec, Limit, Mount,
-        MountTypeEnum, NetworkAttachmentConfig, Service, ServiceCreateResponse, ServiceSpec,
-        ServiceSpecMode, ServiceSpecModeReplicated, ServiceSpecUpdateConfig, ServiceUpdateResponse,
-        TaskSpec, TaskSpecContainerSpec, TaskSpecPlacement, TaskSpecResources,
+        EndpointPortConfig, EndpointPortConfigPublishModeEnum, EndpointSpec, HealthConfig, Limit,
+        Mount, MountTypeEnum, NetworkAttachmentConfig, Service, ServiceCreateResponse, ServiceSpec,
+        ServiceSpecMode, ServiceSpecModeReplicated, ServiceSpecUpdateConfig,
+        ServiceSpecUpdateConfigFailureActionEnum, ServiceSpecUpdateConfigOrderEnum,
+        ServiceUpdateResponse, TaskSpec, TaskSpecContainerSpec, TaskSpecPlacement,
+        TaskSpecResources, TaskSpecRestartPolicy, TaskSpecRestartPolicyConditionEnum,
     },
     service::{InspectServiceOptions, ListServicesOptions, UpdateServiceOptions},
 };
 
-use crate::{ok, strf};
+use crate::{config::HealthCheck, ok, strf};
 
 use super::DockerService;
 
@@ -24,6 +26,11 @@ impl DockerService {
         });
         let services = self.conn.list_services(opt).await?;
         ok!(services)
+    }
+
+    pub async fn inspect_service(&self, name: String) -> Result<Service> {
+        let service = self.conn.inspect_service(&name, None).await?;
+        ok!(service)
     }
 
     pub async fn create_service(&self, params: ServiceParam) -> Result<ServiceCreateResponse> {
@@ -70,6 +77,25 @@ impl DockerService {
         }
         false
     }
+
+    pub async fn get_service(&self, name: String) -> Result<Service> {
+        let services = self.list_services().await?;
+        let service = services
+            .into_iter()
+            .find(|s| s.spec.as_ref().unwrap().name.as_ref().unwrap() == &name)
+            .ok_or(anyhow!("service not found"))?;
+        ok!(service)
+    }
+}
+
+#[tokio::test]
+async fn test_get_go() {
+    let service_name = "go-pro-main-service".to_string();
+    let sv = DockerService::new().unwrap();
+    let service = sv.get_service(service_name).await.unwrap();
+    dbg!(&service.update_status);
+    dbg!(&service.update_status);
+    dbg!(&service.service_status);
 }
 
 pub struct ServiceParam {
@@ -84,12 +110,16 @@ pub struct ServiceParam {
     pub envs: HashMap<String, String>,
     pub mounts: Vec<ServiceMount>,
     pub args: Vec<String>,
+    pub cmd: Option<Vec<String>>,
 
     // swarm params
     pub cpu: f64,
     pub memory: u32,
     pub replicas: u8,
     pub constraints: Vec<String>,
+    pub restart: TaskSpecRestartPolicyConditionEnum,
+
+    pub healthcheck: Option<HealthCheck>,
 }
 
 #[derive(Clone, Debug)]
@@ -109,10 +139,13 @@ impl ServiceParam {
             envs: HashMap::new(),
             mounts: vec![],
             args: vec![],
+            cmd: None,
             cpu: 1.0,
             memory: 1024,
             replicas: 1,
             constraints: vec![],
+            restart: TaskSpecRestartPolicyConditionEnum::ANY,
+            healthcheck: None,
         }
     }
 
@@ -169,6 +202,19 @@ impl ServiceParam {
                             .map(|(k, v)| format!("{}={}", k, v))
                             .collect(),
                     ),
+                    health_check: if self.healthcheck.is_some() {
+                        let hc = self.healthcheck.clone().unwrap();
+                        Some(HealthConfig {
+                            test: hc.cmd,
+                            interval: hc.interval.map(|i| (i as i64) * 1000 * 1000 * 1000),
+                            timeout: hc.timeout.map(|t| (t as i64) * 1000 * 1000 * 1000),
+                            retries: hc.retries.map(|r| r as i64),
+                            start_period: hc.start_period.map(|s| (s as i64) * 1000 * 1000 * 1000),
+                            start_interval: None,
+                        })
+                    } else {
+                        None
+                    },
                     mounts: Some(
                         self.mounts
                             .clone()
@@ -189,6 +235,7 @@ impl ServiceParam {
                             })
                             .collect(),
                     ),
+                    command: self.cmd.clone(),
                     ..Default::default()
                 }),
                 resources: Some(TaskSpecResources {
@@ -198,6 +245,10 @@ impl ServiceParam {
                         ..Default::default()
                     }),
                     reservations: None,
+                }),
+                restart_policy: Some(TaskSpecRestartPolicy {
+                    condition: Some(self.restart.clone()),
+                    ..Default::default()
                 }),
                 placement: Some(TaskSpecPlacement {
                     constraints: Some(self.constraints.clone()),
@@ -213,7 +264,9 @@ impl ServiceParam {
             }),
             update_config: Some(ServiceSpecUpdateConfig {
                 parallelism: Some(1),
-                delay: Some(10 * 1000 * 1000 * 1000),
+                order: Some(ServiceSpecUpdateConfigOrderEnum::START_FIRST),
+                failure_action: Some(ServiceSpecUpdateConfigFailureActionEnum::CONTINUE),
+                delay: Some(5 * 1000 * 1000 * 1000),
                 ..Default::default()
             }),
             rollback_config: None,

@@ -38,7 +38,6 @@ pub async fn upload(
                         match chunk {
                             Ok(data) => {
                                 field_size += data.len();
-                                println!("Received chunk size: {} bytes", data.len());
                                 if tx.send(data).await.is_err() {
                                     println!("Failed to send chunk through channel");
                                     return;

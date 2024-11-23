@@ -1,13 +1,16 @@
 pub mod deploy;
+pub mod rollback;
 pub mod task;
 
-use std::{collections::HashMap, fmt::format, path::PathBuf, u128};
+use std::{collections::HashMap, fmt::format, path::PathBuf, str::FromStr, u128};
 
 use anyhow::{anyhow, Result};
+use bollard::secret::TaskSpecRestartPolicyConditionEnum;
+use deploy::config_to_connectable;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    config::{AppConfig, DbConfig, ServiceConfig},
+    config::{AppConfig, ConfigProxy, HealthCheck, MainConfig, ServiceConfig},
     docker::{
         service::{ServiceMount, ServiceParam},
         DockerService,
@@ -28,18 +31,22 @@ pub struct Deployable {
     pub docker_image: String,
 
     pub proxies: Vec<ProxyParams>,
+    pub expose: Vec<u16>,
 
     pub envs: HashMap<String, String>,
     pub volumes: HashMap<String, String>,
     pub mounts: HashMap<String, String>,
     pub args: Vec<String>,
-    pub cmd: Vec<String>,
+    pub cmd: Option<Vec<String>>,
+    pub user_labels: HashMap<String, String>,
 
     pub replicas: u32,
     pub cpu: f64,
     pub memory: u64,
+    pub restart: String,
 
     pub https_enabled: bool,
+    pub healthcheck: Option<HealthCheck>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -86,8 +93,6 @@ impl Deployable {
         name: String,
         config: AppConfig,
         project_name: String,
-        secrets: Vec<SecretValue>,
-        connectables: Vec<Connectable>,
         buildables: Vec<Buildable>,
         images: Vec<String>,
     ) -> Result<Self> {
@@ -129,15 +134,19 @@ impl Deployable {
             service_name: get_service_name(&name, &project_name),
             docker_image: image_name,
             proxies: proxy,
-            envs: final_envs(config.envs, connectables, secrets),
+            envs: config.envs.unwrap_or(HashMap::new()),
             volumes: config.volumes.unwrap_or(HashMap::new()),
+            expose: config.expose.unwrap_or(vec![]),
             mounts: config.mounts.unwrap_or(HashMap::new()),
             args: config.args.unwrap_or(vec![]),
-            cmd: vec![],
+            user_labels: config.labels.unwrap_or(HashMap::new()),
+            cmd: config.cmds,
+            restart: config.restart.unwrap_or("always".to_string()),
             replicas: config.replicas.unwrap_or(2),
             cpu: config.cpu.unwrap_or(1.0),
             memory: config.memory.unwrap_or(1024) as u64,
             https_enabled: config.https.unwrap_or(true),
+            healthcheck: config.health_check,
         })
     }
 
@@ -145,8 +154,6 @@ impl Deployable {
         name: String,
         config: ServiceConfig,
         project_name: String,
-        secrets: Vec<SecretValue>,
-        connectables: Vec<Connectable>,
     ) -> Result<Self> {
         let mut proxy = if config.port.is_some() && config.domain.is_some() {
             vec![ProxyParams {
@@ -174,73 +181,19 @@ impl Deployable {
             service_name: get_service_name(&name, &project_name),
             docker_image: config.image,
             proxies: proxy,
-            envs: final_envs(config.envs, connectables, secrets),
+            envs: config.envs.unwrap_or(HashMap::new()),
             volumes: config.volumes.unwrap_or(HashMap::new()),
             mounts: config.mounts.unwrap_or(HashMap::new()),
             args: config.args.unwrap_or(vec![]),
-            cmd: vec![],
+            expose: config.expose.unwrap_or(vec![]),
+            user_labels: config.labels.unwrap_or(HashMap::new()),
+            cmd: config.cmds,
             replicas: config.replicas.unwrap_or(1),
+            restart: config.restart.unwrap_or("always".to_string()),
             cpu: config.cpu.unwrap_or(1.0),
             memory: config.memory.unwrap_or(1024) as u64,
             https_enabled: config.https.unwrap_or(true),
-        })
-    }
-
-    pub fn from_db_config(
-        name: String,
-        config: DbConfig,
-        project_name: String,
-        secrets: Vec<SecretValue>,
-        connectables: Vec<Connectable>,
-    ) -> Result<Self> {
-        // Define default settings
-        let mut envs;
-        let mut volumes = HashMap::new();
-
-        // Override default settings
-        let image_name = match config.from.as_str() {
-            "postgres" | "pg" | "postgresql" => {
-                envs =
-                    get_default_envs("postgres").ok_or(anyhow!("No default envs for postgres"))?;
-                volumes.insert(
-                    get_db_volume_name(&name, &project_name),
-                    "/var/lib/postgresql/data".to_string(),
-                );
-                "postgres".to_string()
-            }
-            "mysql" => {
-                envs = get_default_envs("mysql").ok_or(anyhow!("No default envs for mysql"))?;
-                volumes.insert(
-                    get_db_volume_name(&name, &project_name),
-                    "/var/lib/mysql".to_string(),
-                );
-                "mysql".to_string()
-            }
-            typ => {
-                err!(anyhow!("Invalid database type, your type is {}", typ))
-            }
-        };
-        let user_envs = final_envs(config.envs, connectables, secrets);
-        for (k, v) in user_envs {
-            envs.insert(k, v);
-        }
-
-        ok!(Self {
-            short_name: name.clone(),
-            project_name: project_name.clone(),
-            config_type: "db".to_string(),
-            service_name: get_service_name(&name, &project_name),
-            docker_image: image_name,
-            proxies: vec![],
-            envs,
-            volumes: volumes,
-            mounts: config.mounts.unwrap_or(HashMap::new()),
-            args: config.args.unwrap_or(vec![]),
-            cmd: vec![],
-            replicas: config.replicas.unwrap_or(1),
-            cpu: config.cpu.unwrap_or(1.0),
-            memory: config.memory.unwrap_or(1024) as u64,
-            https_enabled: false
+            healthcheck: config.health_check,
         })
     }
 
@@ -276,19 +229,34 @@ impl Deployable {
         for (k, v) in &self.mounts {
             service_mounts.push(ServiceMount::Bind(k.clone(), v.clone()));
         }
+        let mut labels = self.get_labels(is_https);
+        for (k, v) in self.user_labels.clone() {
+            labels.insert(k, v); // overwrite with user lab
+        }
+        let restart = match self.restart.as_str() {
+            "always" | "any" => TaskSpecRestartPolicyConditionEnum::ANY,
+            "none" | "no" => TaskSpecRestartPolicyConditionEnum::NONE,
+            "on-failure" | "failure" => TaskSpecRestartPolicyConditionEnum::ON_FAILURE,
+            _ => {
+                return Err(anyhow!("Restart policy not supported: {}", self.restart));
+            }
+        };
         ok!(ServiceParam {
             name: self.service_name.clone(),
             image: self.docker_image.clone(),
             network_name: network_name,
             labels: self.get_labels(is_https),
-            exposed_ports: HashMap::new(),
+            exposed_ports: self.expose.clone().into_iter().map(|p| (p, p)).collect(),
             envs: self.envs.clone(),
             mounts: service_mounts,
             args: self.args.clone(),
+            cmd: self.cmd.clone(),
             cpu: self.cpu.try_into()?,
             memory: self.memory.try_into()?,
             replicas: self.replicas.try_into()?,
+            healthcheck: self.healthcheck.clone(),
             constraints: vec![],
+            restart: restart,
         })
     }
 
@@ -351,188 +319,397 @@ impl Deployable {
     }
 }
 
-pub fn get_default_envs(service: &str) -> Option<HashMap<String, String>> {
-    match service {
-        "mysql" => {
-            let mut envs = HashMap::new();
-            envs.insert("MYSQL_DATABASE".to_string(), "mydb".to_string());
-            envs.insert("MYSQL_USER".to_string(), "myuser".to_string());
-            envs.insert("MYSQL_PASSWORD".to_string(), "mypassword".to_string());
-            envs.insert(
-                "MYSQL_ROOT_PASSWORD".to_string(),
-                "myrootpassword".to_string(),
-            );
-            Some(envs)
+pub fn get_parsed_config(
+    config: &str,
+    connectables: &[Connectable],
+    secrets: &[SecretValue],
+) -> Result<MainConfig> {
+    let mut config = MainConfig::from_str(config).map_err(|_| anyhow!("Failed to parse config"))?;
+    let env_func = |envs: HashMap<String, String>| -> Result<HashMap<String, String>> {
+        envs.into_iter()
+            .map(|(key, value)| {
+                let smart_key = to_smart_string(&key, &connectables, &secrets)
+                    .map_err(|e| anyhow!("Error processing environment key '{}': {}", key, e))?;
+                let smart_value =
+                    to_smart_string(&value, &connectables, &secrets).map_err(|e| {
+                        anyhow!("Error processing environment value '{}': {}", value, e)
+                    })?;
+                Ok((smart_key, smart_value))
+            })
+            .collect::<Result<HashMap<String, String>>>()
+    };
+    let vec_func = |elems: Vec<String>| -> Result<Vec<String>> {
+        elems
+            .into_iter()
+            .map(|e| {
+                to_smart_string(&e, &connectables, &secrets)
+                    .map_err(|err| anyhow!("Error processing element '{}': {}", e, err))
+            })
+            .collect::<Result<Vec<String>>>()
+    };
+
+    config.apps = match config.apps {
+        Some(apps) => {
+            let mut new_apps = HashMap::new();
+            for (appname, mut cfg) in apps {
+                cfg.dockerfile = match cfg.dockerfile {
+                    Some(d) => Some(to_smart_string(&d, &connectables, &secrets).map_err(|e| {
+                        anyhow!("Error processing dockerfile for '{}': {}", appname, e)
+                    })?),
+                    None => None,
+                };
+
+                cfg.context = match cfg.context {
+                    Some(d) => Some(to_smart_string(&d, &connectables, &secrets).map_err(|e| {
+                        anyhow!("Error processing context for '{}': {}", appname, e)
+                    })?),
+                    None => None,
+                };
+
+                cfg.build_args = match cfg.build_args {
+                    Some(build_args) => Some(env_func(build_args)?),
+                    None => None,
+                };
+
+                cfg.nix_cmds = match cfg.nix_cmds {
+                    Some(cmds) => Some(vec_func(cmds)?),
+                    None => None,
+                };
+
+                cfg.envs = match cfg.envs {
+                    Some(envs) => Some(env_func(envs)?),
+                    None => None,
+                };
+
+                cfg.labels = match cfg.labels {
+                    Some(labels) => Some(env_func(labels)?),
+                    None => None,
+                };
+
+                cfg.volumes = match cfg.volumes {
+                    Some(volumes) => Some(env_func(volumes)?),
+                    None => None,
+                };
+
+                cfg.mounts = match cfg.mounts {
+                    Some(mounts) => Some(env_func(mounts)?),
+                    None => None,
+                };
+
+                cfg.domain = match cfg.domain {
+                    Some(d) => Some(to_smart_string(&d, &connectables, &secrets).map_err(|e| {
+                        anyhow!("Error processing domain for '{}': {}", appname, e)
+                    })?),
+                    None => None,
+                };
+
+                cfg.path_prefix = match cfg.path_prefix {
+                    Some(d) => Some(to_smart_string(&d, &connectables, &secrets).map_err(|e| {
+                        anyhow!("Error processing path prefix for '{}': {}", appname, e)
+                    })?),
+                    None => None,
+                };
+
+                cfg.args = match cfg.args {
+                    Some(args) => Some(vec_func(args)?),
+                    None => None,
+                };
+
+                cfg.cmds = match cfg.cmds {
+                    Some(cmds) => Some(vec_func(cmds)?),
+                    None => None,
+                };
+
+                cfg.health_check = match cfg.health_check {
+                    Some(mut hc) => {
+                        Some({
+                            if let Some(cmd) = hc.cmd {
+                                let mut new_cmd = Vec::new();
+                                for c in cmd {
+                                    new_cmd.push(to_smart_string(&c, &connectables, &secrets)
+                                        .map_err(|e| {
+                                            anyhow!("Error processing health check command for '{}': {}", appname, e)
+                                        })?);
+                                }
+                                hc.cmd = Some(new_cmd);
+                            }
+                            hc
+                        })
+                    }
+                    None => None,
+                };
+
+                cfg.proxy = match cfg.proxy {
+                    Some(p) => {
+                        let mut new_proxies = Vec::new();
+                        for mut proxy in p {
+                            proxy.domain = to_smart_string(&proxy.domain, &connectables, &secrets)
+                                .map_err(|e| {
+                                    anyhow!("Error processing domain for '{}': {}", appname, e)
+                                })?;
+                            proxy.path_prefix = match proxy.path_prefix {
+                                Some(path) => {
+                                    Some(to_smart_string(&path, &connectables, &secrets).map_err(
+                                        |e| {
+                                            anyhow!(
+                                                "Error processing path prefix for '{}': {}",
+                                                appname,
+                                                e
+                                            )
+                                        },
+                                    )?)
+                                }
+                                None => None,
+                            };
+                            new_proxies.push(proxy);
+                        }
+                        Some(new_proxies)
+                    }
+                    None => None,
+                };
+
+                new_apps.insert(appname, cfg);
+            }
+            Some(new_apps)
         }
-        "postgres" | "pg" | "postgresql" => {
-            let mut envs = HashMap::new();
-            envs.insert("POSTGRES_DB".to_string(), "mydb".to_string());
-            envs.insert("POSTGRES_USER".to_string(), "mypguser".to_string());
-            envs.insert("POSTGRES_PASSWORD".to_string(), "mypassword".to_string());
-            Some(envs)
+        None => None,
+    };
+
+    config.services = match config.services {
+        Some(services) => {
+            let mut new_services = HashMap::new();
+            for (service_name, mut cfg) in services {
+                cfg.image = to_smart_string(&cfg.image, &connectables, &secrets)
+                    .map_err(|e| anyhow!("Error processing image for '{}': {}", service_name, e))?;
+                cfg.envs = match cfg.envs {
+                    Some(envs) => Some(env_func(envs)?),
+                    None => None,
+                };
+
+                cfg.labels = match cfg.labels {
+                    Some(labels) => Some(env_func(labels)?),
+                    None => None,
+                };
+
+                cfg.volumes = match cfg.volumes {
+                    Some(volumes) => Some(env_func(volumes)?),
+                    None => None,
+                };
+
+                cfg.mounts = match cfg.mounts {
+                    Some(mounts) => Some(env_func(mounts)?),
+                    None => None,
+                };
+
+                cfg.domain = match cfg.domain {
+                    Some(d) => Some(to_smart_string(&d, &connectables, &secrets).map_err(|e| {
+                        anyhow!("Error processing domain for '{}': {}", service_name, e)
+                    })?),
+                    None => None,
+                };
+
+                cfg.path_prefix = match cfg.path_prefix {
+                    Some(d) => Some(to_smart_string(&d, &connectables, &secrets).map_err(|e| {
+                        anyhow!("Error processing path prefix for '{}': {}", service_name, e)
+                    })?),
+                    None => None,
+                };
+
+                cfg.args = match cfg.args {
+                    Some(args) => Some(vec_func(args)?),
+                    None => None,
+                };
+
+                cfg.cmds = match cfg.cmds {
+                    Some(cmds) => Some(vec_func(cmds)?),
+                    None => None,
+                };
+
+                cfg.health_check = match cfg.health_check {
+                    Some(mut hc) => {
+                        Some({
+                            if let Some(cmd) = hc.cmd {
+                                let mut new_cmd = Vec::new();
+                                for c in cmd {
+                                    new_cmd.push(to_smart_string(&c, &connectables, &secrets)
+                                        .map_err(|e| {
+                                            anyhow!("Error processing health check command for '{}': {}", service_name, e)
+                                        })?);
+                                }
+                                hc.cmd = Some(new_cmd);
+                            }
+                            hc
+                        })
+                    }
+                    None => None,
+                };
+
+                cfg.proxy = match cfg.proxy {
+                    Some(p) => {
+                        let mut new_proxies = Vec::new();
+                        for mut proxy in p {
+                            proxy.domain = to_smart_string(&proxy.domain, &connectables, &secrets)
+                                .map_err(|e| {
+                                    anyhow!("Error processing domain for '{}': {}", service_name, e)
+                                })?;
+                            proxy.path_prefix = match proxy.path_prefix {
+                                Some(path) => {
+                                    Some(to_smart_string(&path, &connectables, &secrets).map_err(
+                                        |e| {
+                                            anyhow!(
+                                                "Error processing path prefix for '{}': {}",
+                                                service_name,
+                                                e
+                                            )
+                                        },
+                                    )?)
+                                }
+                                None => None,
+                            };
+                            new_proxies.push(proxy);
+                        }
+                        Some(new_proxies)
+                    }
+                    None => None,
+                };
+
+                new_services.insert(service_name, cfg);
+            }
+            Some(new_services)
         }
-        _ => None,
-    }
+        None => None,
+    };
+    ok!(config)
 }
 
-pub fn final_envs(
-    envs: Option<HashMap<String, String>>,
-    connectables: Vec<Connectable>,
-    secrets: Vec<SecretValue>,
-) -> HashMap<String, String> {
-    if envs.is_none() {
-        println!("No envs found");
-        return HashMap::new();
-    }
-    dbg!(&envs);
-    let final_envs: HashMap<String, String> = envs
-        .unwrap()
-        .into_iter()
-        .map(|(key, value)| (key, SmartString::parse_env(&value).ok()))
-        .map(|(k, v)| {
-            let v = v.unwrap_or(SmartString::Text("not found".to_string()));
-            let final_value = match v {
-                SmartString::This { service, method } => {
-                    let connectable = connectables.iter().find(|c| c.short_name == service);
-                    match method.as_str() {
-                        "connection" | "conn" => {
-                            if let Some(connectable) = connectable {
-                                connectable.connection.clone().unwrap_or("".to_string())
-                            } else {
-                                "connectable not found".to_string()
-                            }
-                        }
-                        "internal" | "link" | "url" => {
-                            if let Some(connectable) = connectable {
-                                connectable.internal_link.clone().unwrap_or("".to_string())
-                            } else {
-                                "connectable not found".to_string()
-                            }
-                        }
-                        _ => "".to_string(),
-                    }
-                }
-                SmartString::Text(text) => text,
-                SmartString::Secret(secret_key) => secrets
+pub fn to_smart_string(
+    value: &str,
+    connectables: &[Connectable],
+    secrets: &[SecretValue],
+) -> Result<String> {
+    let parsed = SmartString::parse_env(value)?;
+    let mut fin: Vec<String> = vec![];
+    for p in parsed {
+        let value = match p {
+            SmartString::This { service, method } => {
+                let connectable = connectables
                     .iter()
-                    .find(|s| s.key == secret_key)
-                    .map(|s| s.value.clone())
-                    .unwrap_or("".to_string()),
-            };
+                    .find(|c| c.short_name == service)
+                    .ok_or(anyhow!("could not connect to {}", service))?;
+                let res = match method.as_str() {
+                    "internal" => connectable
+                        .internal_link
+                        .clone()
+                        .ok_or(anyhow!("internal not found: {}", service))?,
+                    "external" => connectable
+                        .external_link
+                        .clone()
+                        .ok_or(anyhow!("external not found"))?,
+                    "host" => connectable.host.clone().ok_or(anyhow!("host not found"))?,
+                    "port" => connectable
+                        .port
+                        .clone()
+                        .map(|p| p.to_string())
+                        .ok_or(anyhow!("port not found"))?,
+                    _ => err!(anyhow!("unknown method: {}", method)),
+                };
+                res
+            }
+            SmartString::Text(text) => text,
+            SmartString::Secret(secret_key) => secrets
+                .iter()
+                .find(|s| s.key == secret_key)
+                .map(|s| s.value.clone())
+                .ok_or(anyhow!("secret not found: {}", secret_key))?,
+        };
+        fin.push(value);
+    }
 
-            (k, final_value)
-        })
-        .collect();
-
-    final_envs
+    Ok(fin.join(""))
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Connectable {
     pub short_name: String,
     pub project_name: String,
-
-    pub connection: Option<String>,
     pub internal_link: Option<String>,
+    pub external_link: Option<String>,
+
+    pub host: Option<String>,
+    pub port: Option<u16>,
 }
 
 impl Connectable {
     pub fn from_service_config(
         name: String,
-        config: ServiceConfig,
+        mut config: ServiceConfig,
         project_name: String,
+        secrets: &[SecretValue],
     ) -> Result<Self> {
-        let connection = None;
+        config.domain = config
+            .domain
+            .map(|d| to_smart_string(&d, &[], &secrets).unwrap_or(d));
+        config.path_prefix = config
+            .path_prefix
+            .map(|d| to_smart_string(&d, &[], &secrets).unwrap_or(d));
+
         let mut internal_link = None;
-        if config.domain.is_some() && config.port.is_some() {
+        let mut external_link = None;
+        if config.port.is_some() {
             internal_link = Some(format!(
                 "{}:{}",
                 get_service_name(&name, &project_name),
                 config.port.unwrap()
             ));
         }
-        ok!(Self {
-            short_name: name.clone(),
-            project_name: project_name.clone(),
-            connection,
-            internal_link
-        })
-    }
-
-    pub fn from_db_config(name: String, config: DbConfig, project_name: String) -> Result<Self> {
-        let connection = match config.from.as_str() {
-            "postgres" | "pg" | "postgresql" => {
-                let default_envs =
-                    get_default_envs("postgres").ok_or(anyhow!("No default envs for postgres"))?;
-                let user_envs = config.envs.unwrap_or(HashMap::new());
-                let username = user_envs
-                    .get("POSTGRES_USER")
-                    .unwrap_or(&default_envs["POSTGRES_USER"]);
-                let password = user_envs
-                    .get("POSTGRES_PASSWORD")
-                    .unwrap_or(&default_envs["POSTGRES_PASSWORD"]);
-                let dbname = user_envs
-                    .get("POSTGRES_DB")
-                    .unwrap_or(&default_envs["POSTGRES_DB"]);
-                Some(format!(
-                    "postgres://{}:{}@{}:5432/{}",
-                    username,
-                    password,
-                    get_service_name(&name, &project_name),
-                    dbname
-                ))
-            }
-
-            "mysql" => {
-                let default_envs =
-                    get_default_envs("mysql").ok_or(anyhow!("No default envs for mysql"))?;
-                let user_envs = config.envs.unwrap_or(HashMap::new());
-                let username = user_envs
-                    .get("MYSQL_USER")
-                    .unwrap_or(&default_envs["MYSQL_USER"]);
-                let password = user_envs
-                    .get("MYSQL_PASSWORD")
-                    .unwrap_or(&default_envs["MYSQL_PASSWORD"]);
-                let dbname = user_envs
-                    .get("MYSQL_DATABASE")
-                    .unwrap_or(&default_envs["MYSQL_DATABASE"]);
-                Some(format!(
-                    "mysql://{}:{}@{}:3306/{}",
-                    username,
-                    password,
-                    get_service_name(&name, &project_name),
-                    dbname
-                ))
-            }
-            typ => {
-                err!(anyhow!("Invalid database type, your type is {}", typ))
-            }
-        };
-
-        let internal_link = None;
-        ok!(Self {
-            short_name: name.clone(),
-            project_name: project_name.clone(),
-            connection,
-            internal_link
-        })
-    }
-
-    pub fn from_app_config(name: String, config: AppConfig, project_name: String) -> Result<Self> {
-        let connection = None;
-        let mut internal_link = None;
         if config.domain.is_some() && config.port.is_some() {
+            external_link = Some(format!("https://{}", config.domain.unwrap()));
+        }
+        ok!(Self {
+            short_name: name.clone(),
+            project_name: project_name.clone(),
+            internal_link,
+            external_link,
+            host: Some(get_service_name(&name, &project_name)),
+            port: config.port.clone(),
+        })
+    }
+
+    pub fn from_app_config(
+        name: String,
+        mut config: AppConfig,
+        project_name: String,
+        secrets: &[SecretValue],
+    ) -> Result<Self> {
+        config.domain = config
+            .domain
+            .map(|d| to_smart_string(&d, &[], &secrets).unwrap_or(d));
+        config.path_prefix = config
+            .path_prefix
+            .map(|d| to_smart_string(&d, &[], &secrets).unwrap_or(d));
+        let mut internal_link = None;
+        let mut external_link = None;
+        if config.port.is_some() {
             internal_link = Some(format!(
                 "{}:{}",
                 get_service_name(&name, &project_name),
                 config.port.unwrap()
             ));
         }
+        if config.domain.is_some() && config.port.is_some() {
+            if config.https.is_some() && !config.https.unwrap() {
+                external_link = Some(format!("http://{}", config.domain.unwrap()));
+            } else {
+                external_link = Some(format!("https://{}", config.domain.unwrap()));
+            }
+        }
         ok!(Self {
             short_name: name.clone(),
             project_name: project_name.clone(),
-            connection,
-            internal_link
+            internal_link,
+            external_link,
+            host: Some(get_service_name(&name, &project_name)),
+            port: config.port.clone(),
         })
     }
 }
@@ -541,76 +718,124 @@ pub fn get_service_name(name: &str, project_name: &str) -> String {
     format!("{}-{}-service", project_name, name)
 }
 
-pub fn get_db_volume_name(name: &str, project_name: &str) -> String {
-    format!("{}-{}-volume", project_name, name)
-}
-
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Buildable {
     pub short_name: String,
     pub project_name: String,
+    pub is_nix: bool,
+    pub nix_cmds: Vec<String>,
     pub docker_file_name: String,
     pub context: PathBuf,
     pub tag: String,
     pub platform: String,
+    pub build_args: Option<HashMap<String, String>>,
 }
 
 impl Buildable {
     pub fn from_app_config(name: String, config: AppConfig, project_name: String) -> Result<Self> {
         let short_name = name.clone();
         let project_name = project_name.clone();
-
-        let docker_file_name = config.dockerfile.unwrap_or("Dockerfile".to_string());
         let context = PathBuf::from(config.context.unwrap_or(".".to_string()));
-
-        let tag = format!("{}-{}-image:{}", project_name, name, get_unix_millis());
         let platform = get_docker_platform()?;
+        let tag = format!("{}-{}-image:{}", project_name, name, get_unix_millis());
 
-        ok!(Self {
-            short_name,
-            project_name,
-            docker_file_name,
-            context,
-            tag,
-            platform
-        })
+        if config.builder.is_some()
+            && (&config.builder.clone().unwrap() == "nix" || &config.builder.unwrap() == "nixpacks")
+        {
+            let mut image_name_found = false;
+            let cmds = if config.nix_cmds.is_some() {
+                let mut raw_cmds = config.nix_cmds.unwrap();
+                for cmd in raw_cmds.iter_mut() {
+                    if cmd == "<tag>" {
+                        *cmd = tag.clone();
+                        image_name_found = true;
+                    } else if cmd == "<context>" {
+                        *cmd = context
+                            .to_str()
+                            .ok_or(anyhow!("Failed to convert context path to string"))?
+                            .to_string();
+                    }
+                }
+                if !image_name_found {
+                    return Err(anyhow!("Failed to find image name in nix_cmds"));
+                }
+                raw_cmds
+            } else {
+                vec![
+                    "nixpacks".to_string(),
+                    "build".to_string(),
+                    context
+                        .to_str()
+                        .ok_or(anyhow!("Failed to convert context path to string"))?
+                        .to_string(),
+                    "--name".to_string(),
+                    tag.clone(),
+                    "--platform".to_string(),
+                    platform.clone(),
+                ]
+            };
+            ok!(Self {
+                short_name,
+                project_name,
+                docker_file_name: "".to_string(),
+                context,
+                is_nix: true,
+                nix_cmds: cmds,
+                tag,
+                platform,
+                build_args: config.build_args,
+            })
+        } else {
+            let docker_file_name = config.dockerfile.unwrap_or("Dockerfile".to_string());
+
+            ok!(Self {
+                short_name,
+                project_name,
+                docker_file_name,
+                context,
+                is_nix: false,
+                nix_cmds: vec![],
+                tag,
+                platform,
+                build_args: config.build_args,
+            })
+        }
     }
 }
 
-// pub struct Backupable {
-//     pub volumes: Vec<String>,
-//     pub service_name: String,
-//     pub short_name: String,
-//     pub project_name: String,
-//     pub s3_access_key: String,
-//     pub s3_secret_key: String,
-//     pub s3_bucket: String,
-//     pub s3_region: Option<String>,
-//     pub s3_endpoint: String,
-//     pub s3_file_name: String,
-//     pub every: Option<u16>,
-// }
-//
-// impl Backupable {
-//     pub fn from_db_config(
-//         name: String,
-//         config: DbConfig,
-//         project_name: String,
-//         secrets: Vec<SecretValue>,
-//         connectables: Vec<Connectable>,
-//     ) -> Result<Self> {
-//         ok!(Self {
-//             volumes: todo!(),
-//             service_name: todo!(),
-//             short_name: todo!(),
-//             project_name,
-//             s3_access_key: todo!(),
-//             s3_secret_key: todo!(),
-//             s3_bucket: todo!(),
-//             s3_region: todo!(),
-//             s3_endpoint: todo!(),
-//             s3_file_name: todo!(),
-//             every: todo!(),
-//         })
-//     }
-// }
+#[test]
+fn parser_test() {
+    let raw_config = r#"
+    project: my-pro
+    apps: 
+        app1:
+            domain: "{{ secret.app1-domain }}"
+            port: 8080
+    services:
+        s1:
+            image: "{{ secret.s1-image }}"
+            port: 3000
+            envs:
+                APP1_LINK: "{{ this.app1.external }}"
+            labels:
+                "{{ secret.s1-label }}": "{{ this.app1.host }}"
+    "#;
+    let secrets = vec![
+        SecretValue {
+            key: "app1-domain".to_string(),
+            value: "my-domain.com".to_string(),
+        },
+        SecretValue {
+            key: "s1-image".to_string(),
+            value: "postgres:16".to_string(),
+        },
+        SecretValue {
+            key: "s1-label".to_string(),
+            value: "app-host".to_string(),
+        },
+    ];
+    let connectables =
+        config_to_connectable(MainConfig::from_str(raw_config).unwrap(), &secrets).unwrap();
+    let parsed_config = get_parsed_config(&raw_config, &connectables, &secrets).unwrap();
+    dbg!(parsed_config);
+}

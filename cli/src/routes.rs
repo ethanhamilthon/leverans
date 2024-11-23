@@ -9,7 +9,7 @@ use crate::{
         handle_local,
         new_handler::handle_new,
         plan_handle::handle_plan,
-        secret_handle::{add_secrets, delete_secrets, list_secrets, update_secrets},
+        secret_handle::{add_secrets, delete_secrets, list_secrets, show_secret, update_secrets},
     },
 };
 
@@ -23,7 +23,22 @@ pub async fn handle_routes(cli: Lev) -> Result<()> {
             only,
             file,
             skip_confirm,
-        } => new_handle_deploy(file, context, build, filter, only, skip_confirm).await,
+            unfold,
+            timeout,
+        } => {
+            new_handle_deploy(
+                file,
+                context,
+                build,
+                filter,
+                only,
+                skip_confirm,
+                unfold,
+                false,
+                timeout,
+            )
+            .await
+        }
         Commands::Auth {
             address,
             password,
@@ -49,6 +64,7 @@ pub async fn handle_routes(cli: Lev) -> Result<()> {
                 update_secrets(key, value).await
             }
             crate::commands::SecretCommands::Delete { key } => delete_secrets(key).await,
+            crate::commands::SecretCommands::Show { key } => show_secret(key).await,
         },
         Commands::Plan {
             file,
@@ -56,8 +72,9 @@ pub async fn handle_routes(cli: Lev) -> Result<()> {
             build,
             single_filter,
             only,
+            unfold,
         } => {
-            handle_plan(single_filter, only, file, context, build).await?;
+            handle_plan(single_filter, only, file, context, build, unfold, false).await?;
             ok!(())
         }
         Commands::New { name } => handle_new(name),
@@ -70,5 +87,25 @@ pub async fn handle_routes(cli: Lev) -> Result<()> {
                 skip_confirm,
             } => create_user(username, password, role, skip_confirm).await,
         },
+        Commands::Rollback {
+            file,
+            context,
+            skip_confirm,
+            unfold,
+            timeout,
+        } => {
+            new_handle_deploy(
+                file,
+                context,
+                None,
+                None,
+                None,
+                skip_confirm,
+                unfold,
+                true,
+                timeout,
+            )
+            .await
+        }
     }
 }

@@ -1,14 +1,7 @@
-use std::{
-    collections::HashMap,
-    error::Error,
-    fmt::{self},
-    str::FromStr,
-};
+use std::{collections::HashMap, error::Error, str::FromStr};
 
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
-
-pub mod shared;
 
 #[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -16,7 +9,6 @@ pub mod shared;
 pub struct MainConfig {
     pub project: String,
     pub apps: Option<HashMap<String, AppConfig>>,
-    pub databases: Option<HashMap<String, DbConfig>>,
     pub services: Option<HashMap<String, ServiceConfig>>,
 }
 
@@ -25,12 +17,18 @@ pub struct MainConfig {
 #[serde(deny_unknown_fields)]
 pub struct AppConfig {
     pub build: Option<String>,
+    #[serde(rename = "build-args")]
+    pub build_args: Option<HashMap<String, String>>,
+    pub builder: Option<String>,
+    pub nix_cmds: Option<Vec<String>>,
     pub dockerfile: Option<String>,
     pub context: Option<String>,
     pub domain: Option<String>,
     pub port: Option<u16>,
     pub path_prefix: Option<String>,
+    pub expose: Option<Vec<u16>>,
     pub envs: Option<HashMap<String, String>>,
+    pub labels: Option<HashMap<String, String>>,
     pub args: Option<Vec<String>>,
     pub cmds: Option<Vec<String>>,
     pub volumes: Option<HashMap<String, String>>,
@@ -40,20 +38,9 @@ pub struct AppConfig {
     pub memory: Option<u32>,
     pub proxy: Option<Vec<ConfigProxy>>,
     pub https: Option<bool>,
-}
-
-#[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(deny_unknown_fields)]
-pub struct DbConfig {
-    pub from: String,
-    pub envs: Option<HashMap<String, String>>,
-    pub args: Option<Vec<String>>,
-    pub volumes: Option<HashMap<String, String>>,
-    pub mounts: Option<HashMap<String, String>>,
-    pub replicas: Option<u32>,
-    pub cpu: Option<f64>,
-    pub memory: Option<u32>,
+    #[serde(rename = "health-check")]
+    pub health_check: Option<HealthCheck>,
+    pub restart: Option<String>,
 }
 
 #[skip_serializing_none]
@@ -63,8 +50,10 @@ pub struct ServiceConfig {
     pub image: String,
     pub domain: Option<String>,
     pub port: Option<u16>,
+    pub expose: Option<Vec<u16>>,
     pub path_prefix: Option<String>,
     pub envs: Option<HashMap<String, String>>,
+    pub labels: Option<HashMap<String, String>>,
     pub args: Option<Vec<String>>,
     pub cmds: Option<Vec<String>>,
     pub volumes: Option<HashMap<String, String>>,
@@ -74,14 +63,30 @@ pub struct ServiceConfig {
     pub memory: Option<u32>,
     pub proxy: Option<Vec<ConfigProxy>>,
     pub https: Option<bool>,
+    #[serde(rename = "health-check")]
+    pub health_check: Option<HealthCheck>,
+    pub restart: Option<String>,
 }
 
 #[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct ConfigProxy {
     pub domain: String,
     pub port: u16,
     pub path_prefix: Option<String>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct HealthCheck {
+    pub cmd: Option<Vec<String>>,
+    pub interval: Option<u32>,
+    pub timeout: Option<u32>,
+    pub retries: Option<u32>,
+    #[serde(rename = "start-period")]
+    pub start_period: Option<u32>,
 }
 
 impl FromStr for MainConfig {

@@ -1,17 +1,12 @@
 use std::{
     fs,
     io::{stdin, stdout, Write},
-    path::{Path, PathBuf},
-    str::FromStr,
+    path::Path,
 };
 
 use anyhow::{anyhow, Result};
 use scopeguard::defer;
-use shared::{
-    config::MainConfig, console::new_loader, docker::DockerService,
-    docker_platform::get_docker_platform, err, ok,
-};
-use tokio::time::sleep;
+use shared::{console::new_loader, docker::DockerService, err, ok};
 
 use crate::{
     api::API,
@@ -27,11 +22,23 @@ pub async fn new_handle_deploy(
     filter: Option<String>,
     only: Option<Vec<String>>,
     skip_confirm: bool,
+    unfold: bool,
+    rollback: bool,
+    timeout: Option<u64>,
 ) -> Result<()> {
-    let (user, deploys) = handle_plan(filter, only, file_name, context.clone(), to_build).await?;
+    let (user, deploys) = handle_plan(
+        filter,
+        only,
+        file_name,
+        context.clone(),
+        to_build,
+        unfold,
+        rollback,
+    )
+    .await?;
     if !skip_confirm {
         let mut confirm = String::new();
-        print!("These are all the tasks that will be deployed. Please confirm (y/n): ");
+        print!("Please confirm (y/n): ");
         stdout().flush()?;
         stdin()
             .read_line(&mut confirm)
@@ -45,34 +52,30 @@ pub async fn new_handle_deploy(
 
     let docker = DockerService::new()?;
     let abs_path = fs::canonicalize(Path::new(&context))?;
-    let built_app_names = new_build_images(deploys.clone(), abs_path, docker.clone()).await?;
-    upload_images(docker, built_app_names, user.remote_token.clone()).await?;
+    let loader = if rollback {
+        let loader = new_loader("rolling back".to_string());
+        loader
+    } else {
+        let built_app_names = new_build_images(deploys.clone(), abs_path, docker.clone()).await?;
+        upload_images(docker, built_app_names, user.remote_token.clone()).await?;
 
-    let loader = new_loader("deploying".to_string());
+        let loader = new_loader("deploying".to_string());
+        loader
+    };
     defer! {
         loader.finish()
     }
     let api = API::new(&user.remote_url)?;
-    let mut failed = false;
-    let mut err_message = String::new();
-    for _ in 0..3 {
-        match api
-            .deploy_plan(deploys.clone(), user.remote_token.clone())
-            .await
-        {
-            Ok(_) => {
-                failed = false;
-                break;
-            }
-            Err(e) => {
-                failed = true;
-                err_message = e.to_string();
-            }
-        }
+    api.deploy_plan(
+        deploys.clone(),
+        user.remote_token.clone(),
+        timeout.unwrap_or(120),
+    )
+    .await?;
+    if rollback {
+        loader.finish_with_message("rolled back successfully");
+    } else {
+        loader.finish_with_message("deployed successfully");
     }
-    if failed {
-        err!(anyhow!("Failed to deploy: {}", err_message));
-    }
-    loader.finish_with_message("deployed successfully");
     ok!(())
 }

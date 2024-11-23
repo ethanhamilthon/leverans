@@ -71,3 +71,17 @@ pub async fn delete_secrets(key: Option<String>) -> Result<()> {
     println!("✔︎ Secret deleted successfully");
     ok!(())
 }
+
+pub async fn show_secret(key: Option<String>) -> Result<()> {
+    let secret_key = match key {
+        Some(key) => key,
+        None => err!(anyhow!("secret key is required")),
+    };
+    let user = UserData::load_db(false).await?.load_current_user().await?;
+    let secret_value = API::new(&user.remote_url)?
+        .show_secret(&secret_key, &user.remote_token)
+        .await?;
+
+    println!("✔︎  {} : {} ", secret_key, secret_value);
+    ok!(())
+}

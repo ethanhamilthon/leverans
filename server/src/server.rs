@@ -8,9 +8,10 @@ use deploy_handler::handle_deploy;
 use docker_handler::upload;
 use futures::FutureExt;
 use healthz_handler::handle_healthz;
-use plan_handler::handle_plan;
+use plan_handler::{handle_plan, handle_rollback};
 use secret_handler::{
-    handle_add_secret, handle_delete_secret, handle_list_secrets, handle_update_secret,
+    handle_add_secret, handle_delete_secret, handle_list_secrets, handle_show_secret,
+    handle_update_secret,
 };
 use shared::docker::DockerService;
 
@@ -64,6 +65,7 @@ pub async fn start_server(server: ServerData) -> std::io::Result<()> {
             .route("/upload_image", web::post().to(upload))
             .route("/new-deploy", web::post().to(handle_deploy))
             .route("/plan", web::get().to(handle_plan))
+            .route("/rollback", web::get().to(handle_rollback))
             .route("/healthz", web::get().to(handle_healthz))
             .route("/auth/super", web::get().to(handle_is_super_user_exists))
             .route("/register/super", web::post().to(register_super_user))
@@ -72,6 +74,7 @@ pub async fn start_server(server: ServerData) -> std::io::Result<()> {
             .route("/secret", web::get().to(handle_list_secrets))
             .route("/secret", web::delete().to(handle_delete_secret))
             .route("/secret", web::put().to(handle_update_secret))
+            .route("/secret/show", web::get().to(handle_show_secret))
             .route("/users", web::post().to(create_new_user))
             .route("/users", web::get().to(user_list))
     })

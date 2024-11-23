@@ -66,6 +66,23 @@ pub async fn handle_delete_secret(
     ok!(HttpResponse::Ok().body("OK"))
 }
 
+pub async fn handle_show_secret(
+    sv: web::Data<Arc<ServerData>>,
+    body: web::Json<DeleteSecretBody>,
+    req: HttpRequest,
+) -> Result<impl Responder> {
+    must_auth(&req, vec![RoleType::SuperUser, RoleType::FullAccess])?;
+    let secret = SecretData::show_db(body.key.to_owned(), &sv.repo.pool)
+        .await
+        .map_err(|_| {
+            InternalError::new(
+                "Failed to delete secret",
+                StatusCode::from_u16(500).unwrap(),
+            )
+        })?;
+    ok!(HttpResponse::Ok().body(secret.value))
+}
+
 pub async fn handle_update_secret(
     sv: web::Data<Arc<ServerData>>,
     body: web::Json<AddSecretBody>,

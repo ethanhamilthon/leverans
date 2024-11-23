@@ -2,7 +2,10 @@ use std::{fs, os, path::Path, process::exit};
 
 use anyhow::{anyhow, Result};
 use shared::{
-    deployable::deploy::{Deploy, DeployAction, DeployTask},
+    deployable::{
+        deploy::{Deploy, DeployAction, DeployTask},
+        rollback,
+    },
     ok,
 };
 
@@ -18,14 +21,9 @@ pub async fn handle_plan(
     file_name: String,
     context: String,
     to_build: Option<Vec<String>>,
+    unfold: bool,
+    rollback: bool,
 ) -> Result<(RemoteAuth, Vec<Deploy>)> {
-    //println!("Plan");
-    //dbg!(&single_filter);
-    //dbg!(&only);
-    //dbg!(&file_name);
-    //dbg!(&context);
-    //dbg!(&no_build);
-
     // prepare config
     let abs_path = fs::canonicalize(Path::new(&context))?;
     let config_path = abs_path.join(&file_name);
@@ -48,15 +46,23 @@ pub async fn handle_plan(
     };
 
     // get plan
-    let deploys = API::new(&user.remote_url)?
-        .get_plans(
-            raw_config,
-            user.remote_token.clone(),
-            to_build,
-            final_filter,
-        )
-        .await?;
-
+    let deploys = if rollback {
+        API::new(&user.remote_url)?
+            .get_rollback_plans(raw_config, user.remote_token.clone())
+            .await?
+    } else {
+        API::new(&user.remote_url)?
+            .get_plans(
+                raw_config,
+                user.remote_token.clone(),
+                to_build,
+                final_filter,
+            )
+            .await?
+    };
+    if unfold {
+        println!("{:?}", deploys);
+    }
     let mut all_task_count = 0;
     // build tasks
     let build_tasks = deploys.iter().fold(vec![], |mut a, b| {
@@ -98,7 +104,7 @@ pub async fn handle_plan(
     }
     // print tasks
     println!("Tasks: ");
-    if !build_tasks.is_empty() {
+    if !build_tasks.is_empty() && !rollback {
         println!("  Build - {}:", build_tasks.len());
         for task in build_tasks {
             println!("    - {}", task.short_name);

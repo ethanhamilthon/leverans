@@ -7,6 +7,9 @@ build-cli:
 build-mgr:
 	python3 ./scripts/build-manager.py $(V) 
 
+release:
+	python3 ./scripts/cli-release.py 
+
 launch:
 	./scripts/run.sh $(V) 
 

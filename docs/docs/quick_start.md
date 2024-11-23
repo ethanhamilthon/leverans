@@ -2,7 +2,7 @@
 title: "Quick Start"
 path: "quick-start"
 folder: "start"
-order: 3
+order: 4
 ---
 
 # Quick Start: Launch first project

@@ -55,7 +55,12 @@ impl API {
         }
     }
 
-    pub async fn deploy_plan(&self, deploys: Vec<Deploy>, token: String) -> Result<()> {
+    pub async fn deploy_plan(
+        &self,
+        deploys: Vec<Deploy>,
+        token: String,
+        timeout: u64,
+    ) -> Result<()> {
         let mut upload_url = self.main_url.clone();
         upload_url.set_path("/new-deploy");
 
@@ -71,7 +76,7 @@ impl API {
             .header("Content-Type", "application/json")
             .header("X-LEVERANS-PASS", "true")
             .header("Authorization", token)
-            .timeout(Duration::from_secs(5))
+            .timeout(Duration::from_secs(timeout))
             .send()
             .await?;
 
@@ -96,6 +101,32 @@ impl API {
             "config": config,
             "filter": filter,
             "to_build": to_build
+        })
+        .to_string();
+        let res = self
+            .req_client
+            .get(upload_url)
+            .body(body)
+            .header("Content-Type", "application/json")
+            .header("X-LEVERANS-PASS", "true")
+            .header("Authorization", token)
+            .send()
+            .await?;
+
+        if res.status().is_success() {
+            let plans = serde_json::from_str::<Vec<Deploy>>(&res.text().await?)?;
+            Ok(plans)
+        } else {
+            let error_text = res.text().await?;
+            Err(anyhow!("Failed to get plans: {}", error_text))
+        }
+    }
+
+    pub async fn get_rollback_plans(&self, config: String, token: String) -> Result<Vec<Deploy>> {
+        let mut upload_url = self.main_url.clone();
+        upload_url.set_path("/rollback");
+        let body = json!({
+            "config": config,
         })
         .to_string();
         let res = self
@@ -351,6 +382,31 @@ impl API {
         } else {
             let error_text = res.text().await?;
             Err(anyhow!("Failed to delete secret: {}", error_text))
+        }
+    }
+
+    pub async fn show_secret(&self, key: &str, token: &str) -> Result<String> {
+        let mut super_user_url = self.main_url.clone();
+        super_user_url.set_path("/secret/show");
+        let res = self
+            .req_client
+            .get(super_user_url)
+            .body(
+                json!({
+                    "key": key,
+                })
+                .to_string(),
+            )
+            .header("Content-Type", "application/json")
+            .header("X-LEVERANS-PASS", "true")
+            .header("Authorization", token)
+            .send()
+            .await?;
+        if res.status().is_success() {
+            Ok(res.text().await?)
+        } else {
+            let error_text = res.text().await?;
+            Err(anyhow!("Failed to show secret: {}", error_text))
         }
     }
 

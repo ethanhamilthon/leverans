@@ -4,6 +4,7 @@ use std::{
     io::{stdout, Write},
     path::{Path, PathBuf},
     pin::Pin,
+    process::{Command, Stdio},
     sync::Arc,
 };
 use tokio::sync::{watch, Mutex};
@@ -18,7 +19,7 @@ use shared::{
     err, ok,
 };
 
-use crate::{api::API, data::UserData, utils::get_unix_seconds};
+use crate::{api::API, data::UserData};
 
 pub struct BuildParams {
     pub docker: DockerService,
@@ -54,46 +55,83 @@ pub async fn new_build_images(
         let docker = docker.clone();
         joined_tasks.push(tokio::spawn(async move {
             // dbg!(&task);
-            let loader = new_loader(format!("building {}", task.short_name));
+            let loader = new_loader(format!(
+                "building {} with {}",
+                task.short_name,
+                if task.is_nix { "nix" } else { "docker" }
+            ));
             defer! {
                 loader.finish()
             }
-            stdout().flush().unwrap();
             let mut logs = vec![];
-            let mut stream: Pin<Box<dyn Stream<Item = Result<_, _>> + Send>> = docker
-                .build_image(
-                    &task.docker_file_name,
-                    &task.tag,
-                    &abs_context.to_str().unwrap(),
-                    Some(&task.platform),
-                )
-                .await
-                .map_err(|e| {
+            if task.is_nix {
+                // dbg!(&task);
+                if task.nix_cmds.len() < 3 {
+                    logs.push("Nix commands should be at least 3 parts".to_string());
+                    err!((task.short_name.clone(), logs))
+                }
+                let child = Command::new(task.nix_cmds[0].clone())
+                    .args(&task.nix_cmds[1..])
+                    .stdout(Stdio::piped())
+                    .stderr(Stdio::piped())
+                    .spawn()
+                    .map_err(|e| {
+                        let err_str = e.to_string();
+                        logs.push(err_str.clone());
+                        (task.short_name.clone(), logs.clone())
+                    })?;
+
+                let output = child
+                    .wait_with_output()
+                    .map_err(|e| {
+                        let err_str = e.to_string();
+                        logs.push(err_str.clone());
+                        (task.short_name.clone(), logs.clone())
+                    })?
+                    .stdout;
+                let output = String::from_utf8(output).map_err(|e| {
                     let err_str = e.to_string();
                     logs.push(err_str.clone());
                     (task.short_name.clone(), logs.clone())
                 })?;
-
-            while let Some(msg) = stream.next().await {
-                if *rx.borrow() {
-                    ok!(task.short_name.clone())
-                }
-                match msg {
-                    Ok(msg) => {
-                        let text = msg.stream.unwrap_or("".to_string());
-                        // println!("{}", text);
-                        logs.push(text);
-                    }
-                    Err(err) => {
-                        let err_str = err.to_string();
-                        // println!("{}", err_str);
+                logs.push(output);
+                ok!(task.short_name.clone())
+            } else {
+                let mut stream: Pin<Box<dyn Stream<Item = Result<_, _>> + Send>> = docker
+                    .build_image(
+                        &task.docker_file_name,
+                        &task.tag,
+                        &abs_context.to_str().unwrap(),
+                        Some(&task.platform),
+                        task.build_args.clone(),
+                    )
+                    .await
+                    .map_err(|e| {
+                        let err_str = e.to_string();
                         logs.push(err_str.clone());
-                        err!((task.short_name.clone(), logs))
+                        (task.short_name.clone(), logs.clone())
+                    })?;
+
+                while let Some(msg) = stream.next().await {
+                    if *rx.borrow() {
+                        ok!(task.short_name.clone())
+                    }
+                    match msg {
+                        Ok(msg) => {
+                            let text = msg.stream.unwrap_or("".to_string());
+                            // println!("{}", text);
+                            logs.push(text);
+                        }
+                        Err(err) => {
+                            let err_str = err.to_string();
+                            // println!("{}", err_str);
+                            logs.push(err_str.clone());
+                            err!((task.short_name.clone(), logs))
+                        }
                     }
                 }
             }
             loader.finish_with_message(format!("built: {}", task.short_name));
-            stdout().flush().unwrap();
             ok!(task.short_name)
         }));
     }

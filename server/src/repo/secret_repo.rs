@@ -67,6 +67,14 @@ impl SecretData {
             .await?;
         Ok(())
     }
+
+    pub async fn show_db(key: String, conn: &SqlitePool) -> Result<SecretData> {
+        let row = query_as::<_, SecretData>("select * from secrets where key = ?")
+            .bind(key)
+            .fetch_one(conn)
+            .await?;
+        Ok(row)
+    }
 }
 
 pub const SECRET_MIGRATION: &str = r#"

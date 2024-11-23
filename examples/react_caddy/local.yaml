@@ -1,0 +1,30 @@
+project: react-caddy
+
+apps:
+  main:
+    build: manual
+    domain: react.localhost
+    port: 80
+    build-args:
+      VITE_DOMAIN: "{{ this.main.external + '/heelo/from/lev' }}"
+
+services:
+  umami-db:
+    image: postgres:15
+    port: 5432
+    envs:
+      POSTGRES_DB: umami
+      POSTGRES_USER: "{{ secret.umami-db-user }}"
+      POSTGRES_PASSWORD: "{{ secret.umami-db-password }}"
+    volumes:
+      umami-db-data: /var/lib/postgresql/data
+
+  umami:
+    image: ghcr.io/umami-software/umami:postgresql-latest
+    domain: umami2.localhost
+    port: 3000
+    expose: [3000]
+    https: false
+    envs:
+      DATABASE_TYPE: "postgresql"
+      DATABASE_URL: "{{ 'postgresql://' + secret.umami-db-user  + ':' + secret.umami-db-password + '@' + this.umami-db.internal + '/umami' }}"
