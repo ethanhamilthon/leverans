@@ -1,0 +1,3 @@
+rustflags = [
+    "-C", "link-arg=/SUBSYSTEM:CONSOLE"
+]
