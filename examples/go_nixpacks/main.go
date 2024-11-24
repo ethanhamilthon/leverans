@@ -7,7 +7,6 @@ import (
 func main() {
 	mux := http.NewServeMux()
 
-	// Добавляем специальный endpoint для healthcheck
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		println("healthcheck")
 		w.WriteHeader(http.StatusOK)
@@ -26,7 +25,7 @@ func main() {
 
 func SomeGetMethod(w http.ResponseWriter, r *http.Request) {
 	_, err := w.Write([]byte("GET method response"))
-	println("hello from", r.URL.Path) // Исправил форматирование
+	println("hello from", r.URL.Path)
 	if err != nil {
 		panic(err)
 	}
@@ -34,7 +33,7 @@ func SomeGetMethod(w http.ResponseWriter, r *http.Request) {
 
 func SomePostMethod(w http.ResponseWriter, r *http.Request) {
 	_, err := w.Write([]byte("POST method response"))
-	println("hello from", r.URL.Path) // Исправил форматирование
+	println("hello from", r.URL.Path)
 	if err != nil {
 		panic(err)
 	}

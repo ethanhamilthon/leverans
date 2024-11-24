@@ -8,6 +8,7 @@ Leverans is a deployment tool that makes launching applications and services to 
 
 Unlike other open-source solutions (Coolify, Kamal, Dokploy, etc.):
 
+- No vendor lock. Can be used with Docker manually.
 - Deploy anything, any way you want.
 - No need for SSH, RCE, DockerHub, or Git.
 - CLI-based, with all configurations in a single file.
@@ -25,7 +26,25 @@ Leverans includes two components:
 
 ### 1. Server – Install on a server with a public IP for production or locally for testing.
 
+Linux/MacOS (amd64 or arm64)
+
+```bash
+curl -sSL https://get.leverans.dev/manager.sh | sh
+```
+
 ### 2. CLI – Install where your code resides. Supports Linux, macOS, and Windows on amd64 and arm64.
+
+Linux/amd64, MacOS/amd64 or MacOS/arm64:
+
+```bash
+curl -sSL https://get.leverans.dev/client.sh | sh
+```
+
+Windows/amd64 or Windows/arm64:
+
+```powershell
+iwr -useb https://get.leverans.dev/client.ps1 | iex
+```
 
 ## Quick Start
 

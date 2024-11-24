@@ -25,6 +25,7 @@ pub struct AppConfig {
     pub context: Option<String>,
     pub domain: Option<String>,
     pub port: Option<u16>,
+    #[serde(rename = "path-prefix")]
     pub path_prefix: Option<String>,
     pub expose: Option<Vec<u16>>,
     pub envs: Option<HashMap<String, String>>,
@@ -33,6 +34,7 @@ pub struct AppConfig {
     pub cmds: Option<Vec<String>>,
     pub volumes: Option<HashMap<String, String>>,
     pub mounts: Option<HashMap<String, String>>,
+    pub constraints: Option<Vec<String>>,
     pub replicas: Option<u32>,
     pub cpu: Option<f64>,
     pub memory: Option<u32>,
@@ -51,6 +53,7 @@ pub struct ServiceConfig {
     pub domain: Option<String>,
     pub port: Option<u16>,
     pub expose: Option<Vec<u16>>,
+    #[serde(rename = "path-prefix")]
     pub path_prefix: Option<String>,
     pub envs: Option<HashMap<String, String>>,
     pub labels: Option<HashMap<String, String>>,
@@ -59,6 +62,7 @@ pub struct ServiceConfig {
     pub volumes: Option<HashMap<String, String>>,
     pub mounts: Option<HashMap<String, String>>,
     pub replicas: Option<u32>,
+    pub constraints: Option<Vec<String>>,
     pub cpu: Option<f64>,
     pub memory: Option<u32>,
     pub proxy: Option<Vec<ConfigProxy>>,

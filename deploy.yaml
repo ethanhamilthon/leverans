@@ -9,3 +9,11 @@ apps:
         port: 8000
       - domain: leverans.dev
         port: 8000
+
+services:
+  dozzle:
+    image: amir20/dozzle:latest
+    domain: dozzle.leverans.dev
+    port: 8080
+    mounts:
+      "/var/run/docker.sock": "/var/run/docker.sock"

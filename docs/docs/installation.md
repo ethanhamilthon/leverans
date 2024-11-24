@@ -18,14 +18,13 @@ Requirements:
 - Publicly available IP (optional, needed to make your application accessible from the internet. But must be accessible from wherever your CLI is)
 - 0.5 vCPU
 - 500 MB RAM
-- Linux/MacOS (arm64/amd64)
+- Linux/amd64 or Linux/arm64
 - Installed Docker (If not, we will automatically install it)
 
 To install, run this script in the server. The script must be run via sudo if it doesn't work without it.
 
 ```bash
 curl -sSL https://get.leverans.dev/manager.sh | sh
-
 ```
 
 After that, you should in a few minutes you should get a successful installation message and next steps.
@@ -44,11 +43,10 @@ Run this command in the computer where you have the code.
 
 ### with Powershell
 
-You can change curl to whatever you have installed in your device.
+You can change iwr to whatever you have installed in your device.
 
 ```powershell
-curl -sSL https://get.leverans.dev/client.ps1 | iex
-
+iwr -useb https://get.leverans.dev/client.ps1 | iex
 ```
 
 ### with Bash
@@ -57,4 +55,22 @@ You can change curl to whatever you have installed in your device.
 
 ```bash
 curl -sSL https://get.leverans.dev/client.sh | sh
+```
+
+### Self Compilation
+
+If you want to compile the CLI from source yourself, clone the repository, navigate to the root folder (Leverans folder), and run the command (rustup must be installed):
+
+```bash
+cargo build --release -p lev
+```
+
+And longer move the binary to where all the binaries on the system are stored or set up a PATH variable.
+
+### Successful installed
+
+Run the command to see if the CLI was successfully installed:
+
+```bash
+lev version
 ```

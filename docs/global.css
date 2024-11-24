@@ -3,58 +3,58 @@
 @tailwind utilities;
 
 h1 {
-	@apply text-4xl font-bold font-serif;
+  @apply text-4xl font-bold font-serif;
 }
 
 h2 {
-	@apply text-2xl font-medium;
+  @apply text-2xl font-medium;
 }
 
 body {
-	@apply bg-neutral-900 text-white;
+  @apply bg-neutral-900 text-white;
 }
 
 .mp {
-	@apply text-zinc-300 text-sm font-light leading-6;
+  @apply text-zinc-300 text-sm font-light leading-6;
 }
 
 .mli {
-	@apply text-zinc-100 text-sm font-light relative before:content-['>'] before:absolute before:left-0 before:mr-2 pl-4;
+  @apply text-zinc-100 text-sm font-light relative before:content-['>'] before:absolute before:left-0 before:mr-2 pl-4;
 }
 
 .ms {
-	@apply font-bold;
+  @apply font-bold;
 }
 
 .mul {
-	@apply flex flex-col gap-1;
+  @apply flex flex-col gap-1;
 }
 
 .mhe {
-	@apply w-full pb-1 pt-5 border-b border-b-zinc-700;
+  @apply w-full pb-1 pt-5 border-b border-b-zinc-700;
 }
 
 .mem {
-	@apply p-1 py-[2px] bg-emerald-800/40 rounded-md;
+  @apply p-1 py-[2px] bg-emerald-800/40 rounded-md;
 }
 
 .mlink {
-	@apply text-blue-400;
+  @apply text-blue-400;
 }
 
 .mcbf {
-	@apply py-3 px-5 text-sm font-light bg-zinc-800/60 rounded-md;
+  @apply py-3 px-5 text-sm font-light bg-zinc-800/60 rounded-md;
 }
 
 .mcbi {
-	@apply px-2 py-1 text-sm font-light bg-zinc-800/60 rounded-md;
+  @apply px-2 py-1 text-sm font-light bg-zinc-800/60 rounded-md;
 }
 
 p {
-	font-family: "Geist Mono", monospace;
-	font-optical-sizing: auto;
-	font-weight: 400;
-	font-style: normal;
+  font-family: "Geist Mono", monospace;
+  font-optical-sizing: auto;
+  font-weight: 400;
+  font-style: normal;
 }
 
 h1,
@@ -63,8 +63,8 @@ h3,
 h4,
 h5,
 h6 {
-	font-family: "Geist Mono", monospace;
-	font-optical-sizing: auto;
-	font-weight: 500;
-	font-style: normal;
+  font-family: "Geist Mono", monospace;
+  font-optical-sizing: auto;
+  font-weight: 500;
+  font-style: normal;
 }

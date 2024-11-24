@@ -57,6 +57,7 @@ docker service create \
     --publish 8080:8080 \
     --mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock \
     --mount type=volume,source=letsencrypt,target=/letsencrypt \
+    --label "traefik.enable=false" \
     traefik:v2.10 \
     --api.insecure=true --api.dashboard=true --entryPoints.web.address=":80" \
     --entryPoints.websecure.address=":443" \

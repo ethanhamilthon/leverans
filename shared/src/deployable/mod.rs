@@ -44,6 +44,7 @@ pub struct Deployable {
     pub cpu: f64,
     pub memory: u64,
     pub restart: String,
+    pub constraints: Option<Vec<String>>,
 
     pub https_enabled: bool,
     pub healthcheck: Option<HealthCheck>,
@@ -143,6 +144,7 @@ impl Deployable {
             cmd: config.cmds,
             restart: config.restart.unwrap_or("always".to_string()),
             replicas: config.replicas.unwrap_or(2),
+            constraints: config.constraints,
             cpu: config.cpu.unwrap_or(1.0),
             memory: config.memory.unwrap_or(1024) as u64,
             https_enabled: config.https.unwrap_or(true),
@@ -189,6 +191,7 @@ impl Deployable {
             user_labels: config.labels.unwrap_or(HashMap::new()),
             cmd: config.cmds,
             replicas: config.replicas.unwrap_or(1),
+            constraints: config.constraints,
             restart: config.restart.unwrap_or("always".to_string()),
             cpu: config.cpu.unwrap_or(1.0),
             memory: config.memory.unwrap_or(1024) as u64,
@@ -255,7 +258,7 @@ impl Deployable {
             memory: self.memory.try_into()?,
             replicas: self.replicas.try_into()?,
             healthcheck: self.healthcheck.clone(),
-            constraints: vec![],
+            constraints: self.constraints.clone().unwrap_or(vec![]),
             restart: restart,
         })
     }

@@ -62,9 +62,7 @@ After successful deployment you can go to _api.mydomain.com_ to check if everyth
 
 ## Updating and Creating a Database
 
-Now let's imagine that we decided to use a database in our application.
-
-Leverans has a couple of options [already configured](/databases/ready-to-go). Let's choose the most popular one - Postgresql.
+Now let's imagine that we decided to use a database in our application. Let's choose the most popular one - Postgresql.
 
 Now we need to do two things: Create a database and connect to our application. Let's modify our config file:
 
@@ -76,16 +74,20 @@ apps:
     domain: api.mydomain.com
     port: 8080
     envs:
-      DATABASE_URL: "{{ this.maindb.connection }}"
+      DATABASE_URL: "postgres://my-user:my-password@maindb:5432/my-db"
 
-databases:
+services:
   maindb:
-    from: pg
+    image: postgres:latest
+    volumes:
+      pgdata: /var/lib/postgresql/data
+    envs:
+      POSTGRES_PASSWORD: my-password
+      POSTGRES_USER: my-user
+      POSTGRES_DB: my-db
 ```
 
-As you can see, another field, _databases_, has appeared on the level with _apps_.
-
-And since our application needs the address of connection to the database, we passed there env variable `DATABASE_URL`. Here we used a thing called [Smart String](/concept/smart-strings). In short, it's just a way of telling Leverans: “Hey, put a connection string of maindb database here”.
+As you can see, another field, _services_, has appeared on the level with _apps_.
 
 Now once again you just have to execute the command:
 

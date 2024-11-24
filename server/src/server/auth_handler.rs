@@ -264,7 +264,6 @@ pub fn check_auth(req: &HttpRequest) -> AnyResult<Claims> {
         .get("Authorization")
         .ok_or(anyhow!("could not find Authorization"))?
         .to_str()?;
-    println!("token: {}", token);
     let claims = verify_jwt(token)?;
     ok!(claims)
 }
