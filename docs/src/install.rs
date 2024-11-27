@@ -13,25 +13,74 @@ pub async fn install_cli_script(_req: actix_web::HttpRequest) -> Result<impl Res
 
 const INSTALL_MANAGER_SCRIPT: &str = r#"
 #!/bin/bash
+
 echo "Installing Lev Manager..."
 VERSION="$1"
 EMAIL="$2"
 
 if [[ -z "$VERSION" ]]; then
-  echo "Usage: $0 <version>"
+  echo "Version not specified"
   exit 1
 fi
 
 if [[ -z "$EMAIL" ]]; then
-  echo "Usage: $0 <version> <email>"
+  echo "Email not specified."
   exit 1
 fi
 
 if ! command -v docker &> /dev/null; then
-    echo "Installing Docker..."
-    curl -fsSL https://get.docker.com -o get-docker.sh
-    sudo sh get-docker.sh
-    rm get-docker.sh
+    echo "Docker not found. Installing Docker..."
+
+    ARCH=$(uname -m)
+    case "$ARCH" in
+        x86_64)
+            PLATFORM="x86_64"
+            ;;
+        aarch64)
+            PLATFORM="aarch64"
+            ;;
+        *)
+            echo "Unsupported architecture: $ARCH"
+            exit 1
+            ;;
+    esac
+
+    DOCKER_VERSION="27.3.1"
+
+    echo "Downloading Docker $DOCKER_VERSION for $PLATFORM..."
+    curl -fsSL "https://download.docker.com/linux/static/stable/${PLATFORM}/docker-${DOCKER_VERSION}.tgz" -o docker.tgz
+
+    echo "Extracting Docker binaries..."
+    tar xzvf docker.tgz
+
+    echo "Installing Docker binaries..."
+    sudo cp docker/* /usr/local/bin/
+    sudo chmod +x /usr/local/bin/docker*
+
+    # Настройка systemd службы для Docker
+    echo "Configuring Docker service..."
+    sudo tee /etc/systemd/system/docker.service > /dev/null <<EOF
+[Unit]
+Description=Docker Service
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/dockerd
+Restart=always
+User=root
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    echo "Starting Docker service..."
+    sudo systemctl daemon-reload
+    sudo systemctl start docker
+    sudo systemctl enable docker
+
+    echo "Docker installation complete!"
+else
+    echo "Docker is already installed."
 fi
 
 if ! sudo systemctl is-active --quiet docker; then
@@ -66,22 +115,22 @@ docker service create \
     --certificatesresolvers.myresolver.acme.email=$EMAIL \
     --certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json
 
-
 docker service create \
     --name lev-service \
     --network lev \
     -e "DBPATH=/data/main.db" \
+    -e "IMAGES_DIR=/images" \
     --label "traefik.enable=true" \
     --label "traefik.http.routers.lev-service.rule=Headers(\`X-LEVERANS-PASS\`, \`true\`)" \
     --label "traefik.http.routers.lev-service.service=lev-service" \
     --label "traefik.http.services.lev-service.loadbalancer.server.port=8081" \
-    --label "traefik.http.routers.lev-service.entrypoints=websecure" \
-    --label "traefik.http.routers.lev-service.tls.certresolver=letsencrypt" \
-    --label "traefik.http.routers.lev-service.tls=true" \
-    --label "traefik.http.routers.lev-service.tls.certresolver=myresolver" \
+    --label "traefik.http.routers.lev-service.entrypoints=web" \
     --mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock \
     --mount type=volume,source=levstore,target=/data/ \
-   "leverans/manager:$VERSION" 
+    --mount type=volume, source=levimage, target=/images/ \
+    "leverans/manager:$VERSION"
+
+echo "Lev Manager setup complete!"
 "#;
 
 pub async fn install_manager(_req: actix_web::HttpRequest) -> Result<impl Responder> {
@@ -95,7 +144,6 @@ const UNINSTALL_MANAGER_SCRIPT: &str = r#"
 echo "Uninstalling Lev Manager..."
 docker service rm lev-service
 docker service rm traefik-service
-docker network rm lev
 docker volume rm levstore
 "#;
 

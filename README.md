@@ -26,10 +26,10 @@ Leverans includes two components:
 
 ### 1. Server – Install on a server with a public IP for production or locally for testing.
 
-Linux/MacOS (amd64 or arm64)
+Linux (amd64 or arm64)
 
 ```bash
-curl -sSL https://get.leverans.dev/manager.sh | sh
+curl -sSL https://get.leverans.dev/manager.sh | sudo sh 0.2.0 <your-email>
 ```
 
 ### 2. CLI – Install where your code resides. Supports Linux, macOS, and Windows on amd64 and arm64.

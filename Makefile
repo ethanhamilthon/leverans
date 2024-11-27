@@ -15,3 +15,9 @@ launch:
 
 clean:
 	./scripts/clean.sh
+
+unix:
+	./scripts/release-cli-unix.sh $(V)
+
+win:
+	powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\release-windows.ps1 -Version $(V)

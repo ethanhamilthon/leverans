@@ -24,7 +24,7 @@ Requirements:
 To install, run this script in the server. The script must be run via sudo if it doesn't work without it.
 
 ```bash
-curl -sSL https://get.leverans.dev/manager.sh | sh
+curl -sSL https://get.leverans.dev/manager.sh | sudo sh 0.2.0 <your-email>
 ```
 
 After that, you should in a few minutes you should get a successful installation message and next steps.
@@ -54,7 +54,7 @@ iwr -useb https://get.leverans.dev/client.ps1 | iex
 You can change curl to whatever you have installed in your device.
 
 ```bash
-curl -sSL https://get.leverans.dev/client.sh | sh
+curl -sSL https://get.leverans.dev/client.sh | sudo sh
 ```
 
 ### Self Compilation

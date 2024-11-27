@@ -83,7 +83,9 @@ impl DockerService {
         let mut result = self.conn.import_image_stream(load_options, stream, None);
 
         while let Some(s) = result.next().await {
-            println!("status {:?}", s?.status);
+            if let Err(e) = s {
+                return Err(anyhow!(e));
+            }
         }
 
         Ok(())

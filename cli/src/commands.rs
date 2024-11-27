@@ -1,17 +1,13 @@
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(name = "leverans", version = "0.1.0", about = "leverans cli client")]
+#[command(name =  "leverans", version = option_env!("LEV_VERSION").unwrap_or(env!("CARGO_PKG_VERSION")), about = "leverans cli client")]
 pub struct Lev {
     #[command(subcommand)]
     pub command: Commands,
 }
 #[derive(Subcommand)]
 pub enum Commands {
-    Local {
-        #[arg(short = 'b', long, default_value_t = false)]
-        build: bool,
-    },
     Deploy {
         #[arg(short = 'f', long, default_value = "deploy.yaml")]
         file: String,

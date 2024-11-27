@@ -15,7 +15,6 @@ use crate::{
 
 pub async fn handle_routes(cli: Lev) -> Result<()> {
     match cli.command {
-        Commands::Local { build } => handle_local(build).await,
         Commands::Deploy {
             context,
             build,
@@ -54,7 +53,8 @@ pub async fn handle_routes(cli: Lev) -> Result<()> {
         Commands::Logout => handle_logout().await,
         Commands::Whoami => whoami().await,
         Commands::Version => {
-            println!("0.1.0");
+            let version = option_env!("LEV_VERSION").unwrap_or(env!("CARGO_PKG_VERSION"));
+            println!("{}", version);
             ok!(())
         }
         Commands::Secret { command } => match command {

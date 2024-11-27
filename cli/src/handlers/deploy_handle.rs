@@ -66,12 +66,34 @@ pub async fn new_handle_deploy(
         loader.finish()
     }
     let api = API::new(&user.remote_url)?;
-    api.deploy_plan(
-        deploys.clone(),
-        user.remote_token.clone(),
-        timeout.unwrap_or(120),
-    )
-    .await?;
+    let mut finished = false;
+    let mut times = 0;
+    let mut errorname = String::new();
+    loop {
+        match api
+            .deploy_plan(
+                deploys.clone(),
+                user.remote_token.clone(),
+                timeout.unwrap_or(120),
+            )
+            .await
+        {
+            Ok(_) => {
+                finished = true;
+                break;
+            }
+            Err(e) => {
+                errorname = e.to_string();
+            }
+        }
+        times += 1;
+        if times > 5 {
+            break;
+        }
+    }
+    if !finished {
+        err!(anyhow!("Failed to deploy: {}", errorname));
+    }
     if rollback {
         loader.finish_with_message("rolled back successfully");
     } else {

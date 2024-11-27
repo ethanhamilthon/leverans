@@ -68,6 +68,7 @@ impl API {
         //println!("{}", body);
         let client = reqwest::Client::builder()
             .danger_accept_invalid_certs(true) // Отключаем проверку сертификатов
+            .connect_timeout(Duration::from_secs(3))
             .build()
             .unwrap();
         let res = client
