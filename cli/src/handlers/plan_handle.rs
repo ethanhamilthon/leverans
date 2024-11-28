@@ -61,7 +61,7 @@ pub async fn handle_plan(
             .await?
     };
     if unfold {
-        println!("{:?}", deploys);
+        dbg!(&deploys);
     }
     let mut all_task_count = 0;
     // build tasks

@@ -7,6 +7,7 @@ use std::{collections::HashMap, fmt::format, path::PathBuf, str::FromStr, u128};
 use anyhow::{anyhow, Result};
 use bollard::secret::TaskSpecRestartPolicyConditionEnum;
 use deploy::config_to_connectable;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -319,6 +320,87 @@ impl Deployable {
             }
         });
         labels
+    }
+}
+
+pub fn get_regex_parsed_config(
+    config: &str,
+    connectables: &[Connectable],
+    secrets: &[SecretValue],
+) -> Result<MainConfig> {
+    let re = Regex::new(r"\$\{([A-Za-z0-9_\-\/\.]+)\}")?;
+
+    let mut replaced_config = String::new();
+    let mut last_match_end = 0;
+    dbg!(&config);
+
+    for caps in re.captures_iter(config) {
+        let mat = caps.get(0).unwrap();
+        dbg!(&mat);
+        replaced_config.push_str(&config[last_match_end..mat.start()]);
+
+        let key = caps.get(1).unwrap().as_str();
+        dbg!(&key);
+        let value = smarter_string(key, connectables, secrets)
+            .map_err(|_| anyhow!("Failed to resolve key: {}", key))?;
+        replaced_config.push_str(&value);
+
+        last_match_end = mat.end();
+    }
+
+    replaced_config.push_str(&config[last_match_end..]);
+
+    let rconfig =
+        MainConfig::from_str(&replaced_config).map_err(|_| anyhow!("Failed to parse config"))?;
+    Ok(rconfig)
+}
+
+pub fn smarter_string(
+    s: &str,
+    connectables: &[Connectable],
+    secrets: &[SecretValue],
+) -> Result<String> {
+    let value = s.trim();
+    dbg!(&value);
+    if value.starts_with("secret.") {
+        let key = value
+            .strip_prefix("secret.")
+            .ok_or(anyhow!("Invalid secret key"))?;
+        let secret = secrets
+            .iter()
+            .find(|s| s.key == key)
+            .ok_or(anyhow!("Secret not found : {}", key))?;
+        ok!(secret.value.clone())
+    } else if value.starts_with("this.") {
+        let key = value
+            .strip_prefix("this.")
+            .ok_or(anyhow!("Invalid connectable key"))?;
+        dbg!(&key);
+        let parts = key.splitn(2, '.').collect::<Vec<_>>();
+        let connectable = connectables
+            .iter()
+            .find(|c| c.short_name == parts[0])
+            .ok_or(anyhow!("Connect not found : {}", parts[0]))?;
+        let final_str = match parts[1] {
+            "internal" => connectable
+                .internal_link
+                .clone()
+                .ok_or(anyhow!("internal not found: {}", parts[0]))?,
+            "external" => connectable
+                .external_link
+                .clone()
+                .ok_or(anyhow!("external not found: {}", parts[0]))?,
+            "host" => connectable.host.clone().ok_or(anyhow!("host not found"))?,
+            "port" => connectable
+                .port
+                .clone()
+                .map(|p| p.to_string())
+                .ok_or(anyhow!("port not found"))?,
+            _ => err!(anyhow!("unknown method: {}", parts[1])),
+        };
+        ok!(final_str)
+    } else {
+        err!(anyhow!("Invalid value: {}", value));
     }
 }
 
@@ -645,17 +727,9 @@ pub struct Connectable {
 impl Connectable {
     pub fn from_service_config(
         name: String,
-        mut config: ServiceConfig,
+        config: ServiceConfig,
         project_name: String,
-        secrets: &[SecretValue],
     ) -> Result<Self> {
-        config.domain = config
-            .domain
-            .map(|d| to_smart_string(&d, &[], &secrets).unwrap_or(d));
-        config.path_prefix = config
-            .path_prefix
-            .map(|d| to_smart_string(&d, &[], &secrets).unwrap_or(d));
-
         let mut internal_link = None;
         let mut external_link = None;
         if config.port.is_some() {
@@ -678,18 +752,7 @@ impl Connectable {
         })
     }
 
-    pub fn from_app_config(
-        name: String,
-        mut config: AppConfig,
-        project_name: String,
-        secrets: &[SecretValue],
-    ) -> Result<Self> {
-        config.domain = config
-            .domain
-            .map(|d| to_smart_string(&d, &[], &secrets).unwrap_or(d));
-        config.path_prefix = config
-            .path_prefix
-            .map(|d| to_smart_string(&d, &[], &secrets).unwrap_or(d));
+    pub fn from_app_config(name: String, config: AppConfig, project_name: String) -> Result<Self> {
         let mut internal_link = None;
         let mut external_link = None;
         if config.port.is_some() {
@@ -812,16 +875,16 @@ fn parser_test() {
     project: my-pro
     apps: 
         app1:
-            domain: "{{ secret.app1-domain }}"
+            domain: ${secret.app1-domain}
             port: 8080
     services:
         s1:
-            image: "{{ secret.s1-image }}"
+            image: ${secret.s1-image}
             port: 3000
             envs:
-                APP1_LINK: "{{ this.app1.external }}"
+                APP1_LINK: ${this.app1.external}
             labels:
-                "{{ secret.s1-label }}": "{{ this.app1.host }}"
+                ${secret.s1-label}: ${this.app1.host}
     "#;
     let secrets = vec![
         SecretValue {
@@ -837,8 +900,7 @@ fn parser_test() {
             value: "app-host".to_string(),
         },
     ];
-    let connectables =
-        config_to_connectable(MainConfig::from_str(raw_config).unwrap(), &secrets).unwrap();
-    let parsed_config = get_parsed_config(&raw_config, &connectables, &secrets).unwrap();
+    let connectables = config_to_connectable(MainConfig::from_str(raw_config).unwrap()).unwrap();
+    let parsed_config = get_regex_parsed_config(&raw_config, &connectables, &secrets).unwrap();
     dbg!(parsed_config);
 }

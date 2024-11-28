@@ -8,10 +8,7 @@ use super::{task::run_deploy_task, Buildable, Connectable, Deployable};
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 
-pub fn config_to_connectable(
-    config: MainConfig,
-    secrets: &[SecretValue],
-) -> Result<Vec<Connectable>> {
+pub fn config_to_connectable(config: MainConfig) -> Result<Vec<Connectable>> {
     let mut connectables = vec![];
     if let Some(apps) = config.apps {
         for (app_name, app) in apps {
@@ -19,7 +16,6 @@ pub fn config_to_connectable(
                 app_name,
                 app,
                 config.project.clone(),
-                secrets,
             )?);
         }
     }
@@ -30,7 +26,6 @@ pub fn config_to_connectable(
                 service_name,
                 service,
                 config.project.clone(),
-                secrets,
             )?);
         }
     }
@@ -269,7 +264,7 @@ pub fn plan(mut params: PlanParamaters) -> Result<Vec<Deploy>> {
         });
 
     // get all configuration // all logic is here
-    let connectables = config_to_connectable(main_config.clone(), &params.secrets)?;
+    let connectables = config_to_connectable(main_config.clone())?;
     let mconfig = get_parsed_config(
         main_config.to_string().as_str(),
         &connectables,
