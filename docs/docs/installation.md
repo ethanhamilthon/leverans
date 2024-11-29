@@ -24,7 +24,7 @@ Requirements:
 To install, run this script in the server. The script must be run via sudo if it doesn't work without it.
 
 ```bash
-curl -sSL https://get.leverans.dev/manager.sh | sudo sh 0.2.0 <your-email>
+curl -sSL https://get.leverans.dev/manager.sh?v=0.2.0&e=your-email@gmail.com | sudo sh
 ```
 
 After that, you should in a few minutes you should get a successful installation message and next steps.

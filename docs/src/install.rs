@@ -1,4 +1,6 @@
-use actix_web::{HttpResponse, Responder, Result};
+use actix_web::{web, HttpResponse, Responder, Result};
+use regex::Regex;
+use serde::Deserialize;
 
 const INSTALL_CLI_SCRIPT: &str = r#"
 #!/bin/bash
@@ -15,8 +17,8 @@ const INSTALL_MANAGER_SCRIPT: &str = r#"
 #!/bin/bash
 
 echo "Installing Lev Manager..."
-VERSION="$1"
-EMAIL="$2"
+VERSION="acac"
+EMAIL="abab"
 
 if [[ -z "$VERSION" ]]; then
   echo "Version not specified"
@@ -57,7 +59,6 @@ if ! command -v docker &> /dev/null; then
     sudo cp docker/* /usr/local/bin/
     sudo chmod +x /usr/local/bin/docker*
 
-    # Настройка systemd службы для Docker
     echo "Configuring Docker service..."
     sudo tee /etc/systemd/system/docker.service > /dev/null <<EOF
 [Unit]
@@ -127,16 +128,47 @@ docker service create \
     --label "traefik.http.routers.lev-service.entrypoints=web" \
     --mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock \
     --mount type=volume,source=levstore,target=/data/ \
-    --mount type=volume, source=levimage, target=/images/ \
+    --mount type=volume,source=levimage,target=/images/ \
     "leverans/manager:$VERSION"
 
 echo "Lev Manager setup complete!"
 "#;
 
-pub async fn install_manager(_req: actix_web::HttpRequest) -> Result<impl Responder> {
+#[derive(Deserialize)]
+pub struct InstallManagerQuery {
+    // version
+    v: Option<String>,
+    // email
+    e: Option<String>,
+}
+
+static VERSIONS: [&str; 1] = ["0.1.9.1"];
+
+pub async fn install_manager(
+    _req: actix_web::HttpRequest,
+    query: web::Query<InstallManagerQuery>,
+) -> Result<impl Responder> {
+    let version = if let Some(version) = query.v.clone() {
+        if VERSIONS.contains(&version.as_str()) {
+            version
+        } else {
+            VERSIONS[0].to_string()
+        }
+    } else {
+        VERSIONS[0].to_string()
+    };
+
+    let email = query.e.clone().unwrap_or("admin@admin.com".to_string());
+    let reg = Regex::new(r"acac").unwrap();
+    let prefinal = reg
+        .replace_all(&INSTALL_MANAGER_SCRIPT, &version)
+        .to_string();
+    let reg = Regex::new(r"abab").unwrap();
+    let final_rep = reg.replace_all(&prefinal, &email).to_string();
+
     Ok(HttpResponse::Ok()
         .content_type("text/plain")
-        .body(INSTALL_MANAGER_SCRIPT))
+        .body(final_rep))
 }
 
 const UNINSTALL_MANAGER_SCRIPT: &str = r#"

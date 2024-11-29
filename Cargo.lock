@@ -1080,6 +1080,7 @@ dependencies = [
  "anyhow",
  "askama",
  "pulldown-cmark",
+ "regex",
  "serde",
  "serde_yaml",
  "walkdir",

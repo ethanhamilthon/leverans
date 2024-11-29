@@ -9,6 +9,8 @@ apps:
         port: 8000
       - domain: leverans.dev
         port: 8000
+      - domain: get.leverans.dev
+        port: 8000
 
 services:
   dozzle:
