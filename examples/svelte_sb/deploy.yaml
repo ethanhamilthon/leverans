@@ -1,0 +1,18 @@
+project: sv
+
+apps:
+  main:
+    domain: svelte.172.245.84.56.sslip.io
+    port: 3000
+    envs:
+      VITE_POCKETBASE_URL: ${this.pocketbase.external}
+    build-args:
+      VITE_POCKETBASE_URL: ${this.pocketbase.external}
+
+services:
+  pocketbase:
+    image: ghcr.io/muchobien/pocketbase:latest
+    volumes:
+      pocketbase-volume: /pb_data
+    domain: pocketbase.172.245.84.56.sslip.io
+    port: 8090
