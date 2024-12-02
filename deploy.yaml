@@ -11,7 +11,7 @@ apps:
 services:
   dozzle:
     image: amir20/dozzle:latest
-    domain: dozzle.leverans.dev
+    domain: ${secret.dozzle-domain}
     port: 8080
     mounts:
       "/var/run/docker.sock": "/var/run/docker.sock"
@@ -21,14 +21,15 @@ services:
     domain: umami.leverans.dev
     port: 3000
     envs:
-      DATABASE_URL: postgresql://umami:umami@lev-docs-umami-db-service:5432/umami
+      DATABASE_URL: postgresql://umami:${secret.umami-db-pass}@${this.umami-db.internal}/umami
       DATABASE_TYPE: postgresql
 
   umami-db:
     image: postgres:15-alpine
+    port: 5432
     envs:
       POSTGRES_USER: umami
-      POSTGRES_PASSWORD: umami
+      POSTGRES_PASSWORD: ${secret.umami-db-pass}
       POSTGRES_DB: umami
     volumes:
       umami-db-data: /var/lib/postgresql/data

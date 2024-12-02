@@ -3,9 +3,7 @@ project: react-caddy
 apps:
   main:
     build: manual
-    replicas: 1
-    proxy:
-      - domain: react.leverans.dev
-        port: 80
-      - domain: react-caddy.leverans.dev
-        port: 80
+    domain: react.172.245.84.56.sslip.io
+    port: 80
+    build-args:
+      VITE_DOMAIN: ${this.main.external}

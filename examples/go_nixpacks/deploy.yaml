@@ -1,9 +1,0 @@
-project: go-pro
-
-apps:
-  main:
-    domain: go-pro.localhost
-    port: 8090
-    health-check:
-      cmd:
-        ["CMD-SHELL", "wget --spider -q http://localhost:8090/health || exit 1"]

@@ -17,7 +17,7 @@ Unlike other open-source solutions (Coolify, Kamal, Dokploy, etc.):
 
 ## Documentation
 
-- Docs: [https://docs.leverans.dev](https://docs.leverans.dev)
+- Docs: [https://leverans.dev](https://leverans.dev)
 - Examples: [https://github.com/ethanhamilthon/leverans/tree/main/examples](https://github.com/ethanhamilthon/leverans/tree/main/examples)
 
 ## Installation
@@ -29,26 +29,26 @@ Leverans includes two components:
 Linux (amd64 or arm64)
 
 ```bash
-curl -sSL https://get.leverans.dev/manager.sh?v=0.2.0&e=your-email@gmail.com | sudo sh
+curl -sSL "https://leverans.dev/manager.sh?e=your-email@gmail.com" | sudo sh
 ```
 
 ### 2. CLI – Install where your code resides. Supports Linux, macOS, and Windows on amd64 and arm64.
 
-Linux/amd64, MacOS/amd64 or MacOS/arm64:
+Linux/amd64, MacOS/amd64 or MacOS/arm64
 
 ```bash
-curl -sSL https://get.leverans.dev/client.sh | sh
+curl -sSL "https://leverans.dev/install" | sudo sh
 ```
 
-Windows/amd64 or Windows/arm64:
+Windows/amd64 or Windows/arm64
 
 ```powershell
-iwr -useb https://get.leverans.dev/client.ps1 | iex
+iwr -useb "https://leverans.dev/install?os=win" | iex
 ```
 
 ## Quick Start
 
-Get started fast with clear, easy-to-follow guides in [our documentation.](https://docs.leverans.dev/start/quick-start)
+Get started fast with clear, easy-to-follow guides in [our documentation.](https://leverans.dev/start/quick-start)
 
 ## Version
 

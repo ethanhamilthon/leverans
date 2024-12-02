@@ -36,7 +36,7 @@ Leverans includes two components:
 Linux (amd64 or arm64)
 
 ```bash
-curl -sSL "https://leverans.dev/manager.sh?v=0.2.0&e=your-email@gmail.com" | sudo sh
+curl -sSL "https://leverans.dev/manager.sh?e=your-email@gmail.com" | sudo sh
 ```
 
 ### 2. CLI – Install where your code resides. Supports Linux, macOS, and Windows on amd64 and arm64.
@@ -44,13 +44,13 @@ curl -sSL "https://leverans.dev/manager.sh?v=0.2.0&e=your-email@gmail.com" | sud
 Linux/amd64, MacOS/amd64 or MacOS/arm64
 
 ```bash
-curl -sSL "https://leverans.dev/install?v=0.2.0" | sudo sh
+curl -sSL "https://leverans.dev/install" | sudo sh
 ```
 
 Windows/amd64 or Windows/arm64
 
 ```powershell
-iwr -useb "https://leverans.dev/install?os=win&v=0.2.0" | iex
+iwr -useb "https://leverans.dev/install?os=win" | iex
 ```
 
 ## Quick Start

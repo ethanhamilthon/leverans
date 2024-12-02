@@ -1,0 +1,18 @@
+project: go-pro
+
+apps:
+  main:
+    build: manual
+    domain: go.172.245.84.56.sslip.io
+    port: 8090
+    health-check:
+      cmd:
+        ["CMD-SHELL", "wget --spider -q http://localhost:8090/health || exit 1"]
+
+services:
+  dozzle:
+    image: amir20/dozzle:latest
+    domain: dozzle.172.245.84.56.sslip.io
+    port: 8080
+    mounts:
+      "/var/run/docker.sock": "/var/run/docker.sock"
