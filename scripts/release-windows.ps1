@@ -11,7 +11,7 @@ $binPath = "bin\$Version"
 New-Item -ItemType Directory -Force -Path $binPath | Out-Null
 
 $targets = @(
-    "x86_64-pc-windows-msvc",
+    "x86_64-pc-windows-msvc"
 )
 
 foreach ($target in $targets) {
