@@ -1,7 +1,10 @@
 use std::{collections::HashMap, str::FromStr, sync::Arc};
 
 use crate::{
-    config::MainConfig, deployable::get_parsed_config, docker::DockerService, err, ok, SecretValue,
+    config::MainConfig,
+    deployable::{get_parsed_config, get_regex_parsed_config},
+    docker::DockerService,
+    err, ok, SecretValue,
 };
 
 use super::{task::run_deploy_task, Buildable, Connectable, Deployable};
@@ -265,7 +268,7 @@ pub fn plan(mut params: PlanParamaters) -> Result<Vec<Deploy>> {
 
     // get all configuration // all logic is here
     let connectables = config_to_connectable(main_config.clone())?;
-    let mconfig = get_parsed_config(
+    let mconfig = get_regex_parsed_config(
         main_config.to_string().as_str(),
         &connectables,
         &params.secrets,

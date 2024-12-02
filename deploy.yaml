@@ -5,11 +5,7 @@ apps:
     build: manual
     dockerfile: Dockerfile.docs
     proxy:
-      - domain: docs.leverans.dev
-        port: 8000
       - domain: leverans.dev
-        port: 8000
-      - domain: get.leverans.dev
         port: 8000
 
 services:
@@ -19,3 +15,20 @@ services:
     port: 8080
     mounts:
       "/var/run/docker.sock": "/var/run/docker.sock"
+
+  umami:
+    image: ghcr.io/umami-software/umami:postgresql-latest
+    domain: umami.leverans.dev
+    port: 3000
+    envs:
+      DATABASE_URL: postgresql://umami:umami@lev-docs-umami-db-service:5432/umami
+      DATABASE_TYPE: postgresql
+
+  umami-db:
+    image: postgres:15-alpine
+    envs:
+      POSTGRES_USER: umami
+      POSTGRES_PASSWORD: umami
+      POSTGRES_DB: umami
+    volumes:
+      umami-db-data: /var/lib/postgresql/data

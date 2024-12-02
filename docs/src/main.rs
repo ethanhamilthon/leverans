@@ -38,7 +38,7 @@ async fn main() -> std::io::Result<()> {
     println!("Server starting in http://localhost:8000/");
     HttpServer::new(move || {
         App::new()
-            .route("/install.sh", web::get().to(install_cli_script))
+            .route("/install", web::get().to(install_cli_script))
             .route("/manager.sh", web::get().to(install_manager))
             .route("/uninstall.sh", web::get().to(uninstall_manager))
             .default_service(web::route().to(index))
