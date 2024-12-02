@@ -1,0 +1,8 @@
+project: django
+
+apps:
+  main:
+    domain: django.172.245.84.56.sslip.io
+    port: 8000
+    volumes:
+      django-sqlite: /data
