@@ -24,7 +24,7 @@ Requirements:
 To install, run this script in the server. The script must be run via sudo if it doesn't work without it.
 
 ```bash
-curl -sSL "https://leverans.dev/manager.sh?v=0.2.0&e=your-email@gmail.com" | sudo sh
+curl -sSL "https://leverans.dev/manager.sh?e=your-email@gmail.com" | sudo sh
 ```
 
 After that, you should in a few minutes you should get a successful installation message and next steps.
@@ -46,7 +46,7 @@ Run this command in the computer where you have the code.
 You can change iwr to whatever you have installed in your device.
 
 ```powershell
-iwr -useb "https://leverans.dev/install?os=win&v=0.2.0" | iex
+iwr -useb "https://leverans.dev/install?os=win" | iex
 ```
 
 ### with Bash
@@ -54,7 +54,7 @@ iwr -useb "https://leverans.dev/install?os=win&v=0.2.0" | iex
 You can change curl to whatever you have installed in your device.
 
 ```bash
-curl -sSL "https://leverans.dev/install?v=0.2.0" | sudo sh
+curl -sSL "https://leverans.dev/install" | sudo sh
 ```
 
 ### Self Compilation
